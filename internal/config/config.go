@@ -12,7 +12,7 @@ type Config struct {
 
 func LoadConfig() Config {
 	defaultConfig := Config{
-		ControllerBaseUrl: "http://34.58.48.78/api/v1",
+		ControllerBaseUrl: "http://34.58.48.78",
 	}
 
 	homeDir, err := os.UserHomeDir()
