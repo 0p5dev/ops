@@ -1,0 +1,18 @@
+steps:
+  - id: Build go binary
+    name: gcr.io/cloud-builders/go
+    args: ["build", "-o", "ops", "."]
+    env:
+      - "GOOS=linux"
+      - "CGO_ENABLED=0"
+      - "GOARCH=amd64"
+
+serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+tags:
+  - development
+  - ops
