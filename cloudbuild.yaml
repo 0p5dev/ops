@@ -1,13 +1,13 @@
 steps:
   # Build the Go binary
-  # - id: Build go binary
-  #   name: golang:1.25-trixie
-  #   entrypoint: "go"
-  #   args: ["build", "-o", "ops", "."]
-  #   env:
-  #     - "GOOS=linux"
-  #     - "CGO_ENABLED=0"
-  #     - "GOARCH=amd64"
+  - id: Build go binary
+    name: golang:1.25-trixie
+    entrypoint: "go"
+    args: ["build", "-o", "ops", "."]
+    env:
+      - "GOOS=linux"
+      - "CGO_ENABLED=0"
+      - "GOARCH=amd64"
 
   # Retrieve the github access token from Secret Manager and inject it as an env variable
   - id: Retrieve GitHub access Token
@@ -18,7 +18,21 @@ steps:
       - |
         GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
         echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
-        cat /workspace/env.sh
+
+  # Create new github release and upload the built binary as release asset
+  - id: Create GitHub Release
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        source /workspace/env.sh
+        TAG_NAME="$_TAG_NAME"
+        echo "----- Creating GitHub Release $$TAG_NAME -----"
+        RELEASE_RESPONSE=$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$$TAG_NAME","name":"Release $$TAG_NAME","draft":false,"prerelease":true}')
+        UPLOAD_URL=$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
+        echo "----- Uploading release asset -----"
+        curl --http1.1 -X POST "$$UPLOAD_URL?name=ops" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops"
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
 
