@@ -17,7 +17,7 @@ steps:
       - "-c"
       - |
         GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
-        echo "export GITHUB_ACCESS_TOKEN=$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
+        echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
         cat /workspace/env.sh
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
