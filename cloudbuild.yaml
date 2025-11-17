@@ -28,12 +28,8 @@ steps:
       - |
         apt-get update && apt-get install -y curl jq
         source /workspace/env.sh
-        echo "----- Creating GitHub Release $TAG_NAME -----"
         RELEASE_RESPONSE=$$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"$TAG_NAME","draft":false,"prerelease":true}')
-        echo "Release response: $$RELEASE_RESPONSE"
         UPLOAD_URL=$$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
-        echo "Upload URL: $$UPLOAD_URL"
-        echo "----- Uploading release asset to $$UPLOAD_URL -----"
         curl --http1.1 -X POST "$$UPLOAD_URL?name=ops" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops"
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
