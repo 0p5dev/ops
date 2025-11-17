@@ -10,14 +10,14 @@ steps:
   #     - "GOARCH=amd64"
 
   # Retrieve the github access token from Secret Manager and inject it as an env variable
-  # - id: Retrieve GitHub access Token
-  #   name: gcr.io/cloud-builders/gcloud
-  #   entrypoint: "bash"
-  #   args:
-  #     - "-c"
-  #     - |
-  #       GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
-  #       echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
+  - id: Retrieve GitHub access Token
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
+        echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
 
   # Create new github release and upload the built binary as release asset
   - id: Create GitHub Release
@@ -26,8 +26,6 @@ steps:
     args:
       - "-c"
       - |
-        echo "$TAG_NAME"
-        echo "$_TAG_NAME"
       # apt-get update && apt-get install -y curl jq
       # source /workspace/env.sh
       # echo "----- Creating GitHub Release $TAG_NAME -----"
