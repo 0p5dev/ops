@@ -23,12 +23,11 @@ steps:
   - id: Create GitHub Release
     name: gcr.io/cloud-builders/gcloud
     entrypoint: "bash"
-    env:
-      - "TAG_NAME=$_TAG_NAME"
     args:
       - "-c"
       - |
-        printenv
+        echo "$TAG_NAME"
+        echo "$_TAG_NAME"
       # apt-get update && apt-get install -y curl jq
       # source /workspace/env.sh
       # echo "----- Creating GitHub Release $TAG_NAME -----"
