@@ -28,13 +28,13 @@ steps:
       - |
         apt-get update && apt-get install -y curl jq
         source /workspace/env.sh
-        echo "----- Creating GitHub Release $_TAG_NAME -----"
-        RELEASE_RESPONSE=$(curl --http1.1 -X PUT https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$_TAG_NAME","name":"Release $_TAG_NAME","draft":false,"prerelease":true}')
+        echo "----- Creating GitHub Release $TAG_NAME -----"
+        RELEASE_RESPONSE=$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"Release $TAG_NAME","draft":false,"prerelease":true}')
         echo "Release response: $$RELEASE_RESPONSE"
         UPLOAD_URL=$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
         echo "Upload URL: $$UPLOAD_URL"
         echo "----- Uploading release asset -----"
-        curl --http1.1 -X PUT "$$UPLOAD_URL?name=ops" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops"
+        curl --http1.1 -X POST "$$UPLOAD_URL?name=ops" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops"
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
 
