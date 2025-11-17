@@ -1,13 +1,13 @@
 steps:
   # Build the Go binary
-  - id: Build go binary
-    name: golang:1.25-trixie
-    entrypoint: "go"
-    args: ["build", "-o", "ops", "."]
-    env:
-      - "GOOS=linux"
-      - "CGO_ENABLED=0"
-      - "GOARCH=amd64"
+  # - id: Build go binary
+  #   name: golang:1.25-trixie
+  #   entrypoint: "go"
+  #   args: ["build", "-o", "ops", "."]
+  #   env:
+  #     - "GOOS=linux"
+  #     - "CGO_ENABLED=0"
+  #     - "GOARCH=amd64"
 
   # Retrieve the github access token from Secret Manager and inject it as an env variable
   - id: Retrieve GitHub access Token
@@ -31,7 +31,9 @@ steps:
         TAG_NAME="$_TAG_NAME"
         echo "----- Creating GitHub Release $$TAG_NAME -----"
         RELEASE_RESPONSE=$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$$TAG_NAME","name":"Release $$TAG_NAME","draft":false,"prerelease":true}')
+        echo "Release response: $$RELEASE_RESPONSE"
         UPLOAD_URL=$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
+        echo "Upload URL: $$UPLOAD_URL"
         echo "----- Uploading release asset -----"
         curl --http1.1 -X POST "$$UPLOAD_URL?name=ops" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops"
 
