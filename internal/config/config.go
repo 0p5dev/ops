@@ -8,11 +8,15 @@ import (
 
 type Config struct {
 	ControllerBaseUrl string `json:"controllerBaseUrl"`
+	SupabaseURL       string `json:"supabaseUrl"`
+	SupabaseKey       string `json:"supabaseKey"`
 }
 
 func LoadConfig() Config {
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",
+		SupabaseURL:       os.Getenv("SUPABASE_URL"),
+		SupabaseKey:       os.Getenv("SUPABASE_KEY"),
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -36,6 +40,14 @@ func LoadConfig() Config {
 	var customConfig Config
 	if err := json.Unmarshal(configData, &customConfig); err != nil {
 		return defaultConfig
+	}
+
+	// Override with env vars if they're set
+	if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
+		customConfig.SupabaseURL = supabaseURL
+	}
+	if supabaseKey := os.Getenv("SUPABASE_KEY"); supabaseKey != "" {
+		customConfig.SupabaseKey = supabaseKey
 	}
 
 	return customConfig
