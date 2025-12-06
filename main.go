@@ -44,6 +44,8 @@ func main() {
 				Action:  auth.Login,
 				Metadata: map[string]any{
 					"controllerBaseUrl": config.ControllerBaseUrl,
+					"supabaseUrl":       config.SupabaseURL,
+					"supabaseKey":       config.SupabaseKey,
 				},
 			},
 		},
