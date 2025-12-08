@@ -2,8 +2,17 @@ steps:
   # Build the Go binary
   - id: Build go binary
     name: golang:1.25-trixie
+    secretEnv:
+      - NUXT_PUBLIC_SUPABASE_API_KEY
+      - NUXT_PUBLIC_SUPABASE_URL
     entrypoint: "go"
-    args: ["build", "-o", "ops_linux_amd64", "."]
+    args:
+      - "build"
+      - "-ldflags"
+      - "-X 'github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL' -X 'github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY'"
+      - "-o"
+      - "ops_linux_amd64"
+      - "."
     env:
       - "GOOS=linux"
       - "CGO_ENABLED=0"
@@ -51,3 +60,10 @@ tags:
   - development
   - ops
   - cli
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/160851347747/secrets/ops-controller-supabase-url/versions/1
+      env: "NUXT_PUBLIC_SUPABASE_URL"
+    - versionName: projects/160851347747/secrets/ops-controller-supabase-anon-public-key/versions/1
+      env: "NUXT_PUBLIC_SUPABASE_API_KEY"

@@ -8,7 +8,6 @@ import (
 	"github.com/0p5dev/ops/internal/auth"
 	"github.com/0p5dev/ops/internal/config"
 	"github.com/0p5dev/ops/internal/deploy"
-	"github.com/0p5dev/ops/internal/scaffold"
 	"github.com/urfave/cli/v3"
 )
 
@@ -17,17 +16,8 @@ func main() {
 
 	cmd := &cli.Command{
 		Name:  "ops",
-		Usage: "A CLI tool to scaffold and deploy developer-first applications",
+		Usage: "A CLI tool to deploy developer-first, autoscaling applications",
 		Commands: []*cli.Command{
-			{
-				Name:    "scaffold",
-				Aliases: []string{"s"},
-				Usage:   "Scaffold a new project",
-				Action:  scaffold.Scaffold,
-				Metadata: map[string]any{
-					"controllerBaseUrl": config.ControllerBaseUrl,
-				},
-			},
 			{
 				Name:    "deploy",
 				Aliases: []string{"d"},

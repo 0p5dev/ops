@@ -2,8 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -15,15 +13,12 @@ type Config struct {
 }
 
 func LoadConfig() Config {
+	var supabaseURL, supabaseKey string
+
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",
-	}
-
-	// Populate Supabase credentials for default config
-	creds, err := getSupabaseCredentials(defaultConfig.ControllerBaseUrl)
-	if err == nil {
-		defaultConfig.SupabaseURL = creds.SupabaseUrl
-		defaultConfig.SupabaseKey = creds.SupabaseAnonPublicKey
+		SupabaseURL:       supabaseURL,
+		SupabaseKey:       supabaseKey,
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -49,12 +44,8 @@ func LoadConfig() Config {
 		return defaultConfig
 	}
 
-	// Get Supabase credentials from the controller
-	creds, err = getSupabaseCredentials(customConfig.ControllerBaseUrl)
-	if err == nil {
-		customConfig.SupabaseURL = creds.SupabaseUrl
-		customConfig.SupabaseKey = creds.SupabaseAnonPublicKey
-	}
+	customConfig.SupabaseURL = supabaseURL
+	customConfig.SupabaseKey = supabaseKey
 
 	// Allow env var override only for development/testing
 	if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
@@ -65,34 +56,4 @@ func LoadConfig() Config {
 	}
 
 	return customConfig
-}
-
-type SupabaseCredentials struct {
-	SupabaseUrl           string `json:"supabase_url"`
-	SupabaseAnonPublicKey string `json:"supabase_anon_public_key"`
-}
-
-func getSupabaseCredentials(controllerBaseUrl string) (SupabaseCredentials, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/auth/supabase-credentials", controllerBaseUrl), nil)
-	if err != nil {
-		return SupabaseCredentials{}, err
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return SupabaseCredentials{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return SupabaseCredentials{}, fmt.Errorf("failed to get supabase credentials, status code: %d", resp.StatusCode)
-	}
-
-	var creds SupabaseCredentials
-	if err := json.NewDecoder(resp.Body).Decode(&creds); err != nil {
-		return SupabaseCredentials{}, err
-	}
-
-	return creds, nil
 }
