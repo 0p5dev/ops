@@ -13,12 +13,12 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	var supabaseURL, supabaseKey string
+	var SupabaseURL, SupabaseKey string
 
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",
-		SupabaseURL:       supabaseURL,
-		SupabaseKey:       supabaseKey,
+		SupabaseURL:       SupabaseURL,
+		SupabaseKey:       SupabaseKey,
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -44,8 +44,8 @@ func LoadConfig() Config {
 		return defaultConfig
 	}
 
-	customConfig.SupabaseURL = supabaseURL
-	customConfig.SupabaseKey = supabaseKey
+	customConfig.SupabaseURL = SupabaseURL
+	customConfig.SupabaseKey = SupabaseKey
 
 	// Allow env var override only for development/testing
 	if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {

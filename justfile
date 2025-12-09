@@ -1,3 +1,5 @@
+set shell := ["/usr/bin/env", "bash", "-c"]
+
 default: install
 
 fmt:
