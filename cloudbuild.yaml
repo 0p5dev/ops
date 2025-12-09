@@ -2,21 +2,18 @@ steps:
   # Build the Go binary
   - id: Build go binary
     name: golang:1.25-trixie
-    secretEnv:
-      - NUXT_PUBLIC_SUPABASE_API_KEY
-      - NUXT_PUBLIC_SUPABASE_URL
-    entrypoint: "go"
+    entrypoint: "bash"
     args:
-      - "build"
-      - "-ldflags"
-      - "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY"
-      - "-o"
-      - "ops_linux_amd64"
-      - "."
+      - "-c"
+      - |
+        go build -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY" -o ops_linux_amd64 .
     env:
       - "GOOS=linux"
       - "CGO_ENABLED=0"
       - "GOARCH=amd64"
+    secretEnv:
+      - NUXT_PUBLIC_SUPABASE_API_KEY
+      - NUXT_PUBLIC_SUPABASE_URL
 
   # Compress the binary into a .tgz file
   - id: Compress binary
