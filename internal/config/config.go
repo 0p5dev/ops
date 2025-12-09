@@ -6,6 +6,12 @@ import (
 	"path/filepath"
 )
 
+// These variables are set at build time via -ldflags
+var (
+	SupabaseURL string
+	SupabaseKey string
+)
+
 type Config struct {
 	ControllerBaseUrl string `json:"controllerBaseUrl"`
 	SupabaseURL       string `json:"-"` // Not exposed in config file
@@ -13,7 +19,6 @@ type Config struct {
 }
 
 func LoadConfig() Config {
-	var SupabaseURL, SupabaseKey string
 
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",

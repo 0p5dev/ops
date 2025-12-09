@@ -9,7 +9,7 @@ steps:
     args:
       - "build"
       - "-ldflags"
-      - "-X 'github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL' -X 'github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY'"
+      - "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY"
       - "-o"
       - "ops_linux_amd64"
       - "."
