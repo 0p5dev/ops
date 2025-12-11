@@ -43,7 +43,7 @@ steps:
       - |
         apt-get update && apt-get install -y curl jq
         source /workspace/env.sh
-        RELEASE_RESPONSE=$$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"$TAG_NAME","draft":false,"prerelease":true}')
+        RELEASE_RESPONSE=$$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"$TAG_NAME","draft":false}')
         UPLOAD_URL=$$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
         curl --http1.1 -X POST "$$UPLOAD_URL?name=ops_linux_amd64.tgz" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops_linux_amd64.tgz"
 
