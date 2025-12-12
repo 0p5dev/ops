@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/0p5dev/ops/internal/auth"
+	"github.com/0p5dev/ops/internal/config"
 	prompts "github.com/0p5dev/ops/internal/prompts"
 	"github.com/0p5dev/ops/internal/ui"
 	"github.com/urfave/cli/v3"
@@ -22,7 +23,8 @@ type TransmitImageResponse struct {
 type CreateDeploymentRequestBody struct {
 	Name           string `json:"name"`
 	ContainerImage string `json:"container_image"`
-	Tier           string `json:"tier"`
+	MinInstances   int    `json:"min_instances"`
+	MaxInstances   int    `json:"max_instances"`
 }
 
 type CreateDeploymentResponseBody struct {
@@ -86,11 +88,12 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 
 	return respBody.Fqin, nil
 }
-func createDeployment(deploymentName string, fqin string, token string, controllerBaseUrl string) (serviceUrl string, err error) {
+func createDeployment(deploymentName string, fqin string, token string, config config.Config) (serviceUrl string, err error) {
 	body := CreateDeploymentRequestBody{
 		Name:           deploymentName,
 		ContainerImage: fqin,
-		Tier:           "free",
+		MinInstances:   config.MinInstances,
+		MaxInstances:   config.MaxInstances,
 	}
 
 	bodyBytes, err := json.Marshal(body)
@@ -98,7 +101,7 @@ func createDeployment(deploymentName string, fqin string, token string, controll
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/deployments", controllerBaseUrl), bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +133,20 @@ func createDeployment(deploymentName string, fqin string, token string, controll
 }
 
 func Deploy(ctx context.Context, cmd *cli.Command) error {
-	controllerBaseUrl := cmd.Metadata["controllerBaseUrl"].(string)
+	config := cmd.Metadata["config"].(config.Config)
+
+	// Override config with command-line flags if provided
+	if cmd.IsSet("min-instances") {
+		config.MinInstances = cmd.Int("min-instances")
+	}
+	if cmd.IsSet("max-instances") {
+		config.MaxInstances = cmd.Int("max-instances")
+	}
+
+	// Validate after flag overrides
+	if config.MinInstances > config.MaxInstances {
+		return fmt.Errorf("minInstances (%d) cannot be greater than maxInstances (%d)", config.MinInstances, config.MaxInstances)
+	}
 
 	token, err := auth.GetBearerToken()
 	if err != nil {
@@ -162,7 +178,7 @@ func Deploy(ctx context.Context, cmd *cli.Command) error {
 
 	// Transmit image with progress indicator
 	stopProgress = ui.ShowProgress("Uploading container image...")
-	fqin, err := transmitCompressedImage(filename, token, controllerBaseUrl)
+	fqin, err := transmitCompressedImage(filename, token, config.ControllerBaseUrl)
 	stopProgress()
 	if err != nil {
 		return fmt.Errorf("failed to transmit compressed image: %v", err)
@@ -172,7 +188,7 @@ func Deploy(ctx context.Context, cmd *cli.Command) error {
 	var serviceUrl string
 	err = ui.ShowSpinner("Creating deployment...", func() error {
 		var createErr error
-		serviceUrl, createErr = createDeployment(deploymentName, fqin, token, controllerBaseUrl)
+		serviceUrl, createErr = createDeployment(deploymentName, fqin, token, config)
 		return createErr
 	})
 	if err != nil {

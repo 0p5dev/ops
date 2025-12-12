@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v3"
+
+	"github.com/0p5dev/ops/internal/config"
 )
 
 type AuthTokens struct {
@@ -41,8 +43,9 @@ type SupabaseAuthResponse struct {
 }
 
 func Login(ctx context.Context, cmd *cli.Command) error {
-	supabaseURL := cmd.Metadata["supabaseUrl"].(string)
-	supabaseKey := cmd.Metadata["supabaseKey"].(string)
+	config := cmd.Metadata["config"].(config.Config)
+	supabaseURL := config.SupabaseURL
+	supabaseKey := config.SupabaseKey
 
 	if supabaseURL == "" || supabaseKey == "" {
 		return fmt.Errorf("supabase URL and Key must be configured. Set SUPABASE_URL and SUPABASE_KEY environment variables or add them to ~/.config/ops/config.json")

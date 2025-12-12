@@ -1,9 +1,11 @@
 package config
 
 import (
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 // These variables are set at build time via -ldflags
@@ -13,52 +15,82 @@ var (
 )
 
 type Config struct {
-	ControllerBaseUrl string `json:"controllerBaseUrl"`
-	SupabaseURL       string `json:"-"` // Not exposed in config file
-	SupabaseKey       string `json:"-"` // Not exposed in config file
+	ControllerBaseUrl string `yaml:"controllerBaseUrl"`
+	SupabaseURL       string `yaml:"-"` // Not exposed in config file
+	SupabaseKey       string `yaml:"-"` // Not exposed in config file
+	MinInstances      int    `yaml:"minInstances"`
+	MaxInstances      int    `yaml:"maxInstances"`
 }
 
-func LoadConfig() Config {
+func LoadConfig() (Config, error) {
 
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",
 		SupabaseURL:       SupabaseURL,
 		SupabaseKey:       SupabaseKey,
+		MinInstances:      0,
+		MaxInstances:      1,
 	}
 
+	// Start with default config
+	finalConfig := defaultConfig
+
+	// Check for global config file
 	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return defaultConfig
+	if err == nil {
+		globalConfigFile := filepath.Join(homeDir, ".config", "ops", "config.yaml")
+		if _, err := os.Stat(globalConfigFile); err == nil {
+			if configData, err := os.ReadFile(globalConfigFile); err == nil {
+				var globalConfig Config
+				if err := yaml.Unmarshal(configData, &globalConfig); err == nil {
+					// Merge global config into final config
+					mergeConfig(&finalConfig, globalConfig)
+				}
+			}
+		}
 	}
 
-	configFile := filepath.Join(homeDir, ".config", "ops", "config.json")
-
-	// Check if config file exists
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		return defaultConfig
+	// Check for local config file in current directory
+	localConfigFile := "ops.config.yaml"
+	if _, err := os.Stat(localConfigFile); err == nil {
+		if configData, err := os.ReadFile(localConfigFile); err == nil {
+			var localConfig Config
+			if err := yaml.Unmarshal(configData, &localConfig); err == nil {
+				// Merge local config into final config (takes precedence over global)
+				mergeConfig(&finalConfig, localConfig)
+			}
+		}
 	}
 
-	// Read and parse config file
-	configData, err := os.ReadFile(configFile)
-	if err != nil {
-		return defaultConfig
-	}
-
-	var customConfig Config
-	if err := json.Unmarshal(configData, &customConfig); err != nil {
-		return defaultConfig
-	}
-
-	customConfig.SupabaseURL = SupabaseURL
-	customConfig.SupabaseKey = SupabaseKey
+	// Always set Supabase credentials from build-time variables
+	finalConfig.SupabaseURL = SupabaseURL
+	finalConfig.SupabaseKey = SupabaseKey
 
 	// Allow env var override only for development/testing
 	if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
-		customConfig.SupabaseURL = supabaseURL
+		finalConfig.SupabaseURL = supabaseURL
 	}
 	if supabaseKey := os.Getenv("SUPABASE_KEY"); supabaseKey != "" {
-		customConfig.SupabaseKey = supabaseKey
+		finalConfig.SupabaseKey = supabaseKey
 	}
 
-	return customConfig
+	// Validate that MinInstances <= MaxInstances
+	if finalConfig.MinInstances > finalConfig.MaxInstances {
+		return Config{}, fmt.Errorf("configuration error: minInstances (%d) cannot be greater than maxInstances (%d)", finalConfig.MinInstances, finalConfig.MaxInstances)
+	}
+
+	return finalConfig, nil
+}
+
+// mergeConfig merges src config values into dst, only overwriting non-zero values
+func mergeConfig(dst *Config, src Config) {
+	if src.ControllerBaseUrl != "" {
+		dst.ControllerBaseUrl = src.ControllerBaseUrl
+	}
+	if src.MinInstances != 0 {
+		dst.MinInstances = src.MinInstances
+	}
+	if src.MaxInstances != 0 {
+		dst.MaxInstances = src.MaxInstances
+	}
 }
