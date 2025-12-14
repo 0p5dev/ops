@@ -88,6 +88,7 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 
 	return respBody.Fqin, nil
 }
+
 func createDeployment(deploymentName string, fqin string, token string, config config.Config) (serviceUrl string, err error) {
 	body := CreateDeploymentRequestBody{
 		Name:           deploymentName,
@@ -101,7 +102,7 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", err
 	}
@@ -182,6 +183,12 @@ func Deploy(ctx context.Context, cmd *cli.Command) error {
 	stopProgress()
 	if err != nil {
 		return fmt.Errorf("failed to transmit compressed image: %v", err)
+	}
+
+	// Clean up the compressed image file after successful transmission
+	if err := os.Remove(filename); err != nil {
+		// Log the error but don't fail the deployment
+		fmt.Printf("Warning: failed to delete temporary file %s: %v\n", filename, err)
 	}
 
 	// Create deployment with spinner

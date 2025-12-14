@@ -1,4 +1,5 @@
 set shell := ["/usr/bin/env", "bash", "-c"]
+set dotenv-load
 
 default: install
 
@@ -19,3 +20,26 @@ add PACKAGE:
 
 install:
     go install
+
+release *MESSAGE:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    LATEST_TAG=$(curl -L \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_ACCESS_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      https://api.github.com/repos/0p5dev/ops/releases/latest | jq -r '.tag_name')
+    
+    echo "Latest release tag: $LATEST_TAG"
+    
+    VERSION=${LATEST_TAG#v}
+    MAJOR=$(echo $VERSION | cut -d. -f1)
+    MINOR=$(echo $VERSION | cut -d. -f2)
+    PATCH=$(echo $VERSION | cut -d. -f3)
+    
+    NEW_PATCH=$((PATCH + 1))
+    NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+    
+    echo "Creating new tag: $NEW_TAG with message: {{MESSAGE}}"
+    git tag -a "$NEW_TAG" -m "{{MESSAGE}}"
+    git push 0p5 "$NEW_TAG"
