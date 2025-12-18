@@ -25,6 +25,7 @@ type CreateDeploymentRequestBody struct {
 	ContainerImage string `json:"container_image"`
 	MinInstances   int    `json:"min_instances"`
 	MaxInstances   int    `json:"max_instances"`
+	Port           int    `json:"port"`
 }
 
 type CreateDeploymentResponseBody struct {
@@ -95,6 +96,7 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 		ContainerImage: fqin,
 		MinInstances:   config.MinInstances,
 		MaxInstances:   config.MaxInstances,
+		Port:           config.Port,
 	}
 
 	bodyBytes, err := json.Marshal(body)
@@ -142,6 +144,9 @@ func Deploy(ctx context.Context, cmd *cli.Command) error {
 	}
 	if cmd.IsSet("max-instances") {
 		config.MaxInstances = cmd.Int("max-instances")
+	}
+	if cmd.IsSet("port") {
+		config.Port = cmd.Int("port")
 	}
 
 	// Validate after flag overrides

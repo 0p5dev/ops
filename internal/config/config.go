@@ -20,6 +20,7 @@ type Config struct {
 	SupabaseKey       string `yaml:"-"` // Not exposed in config file
 	MinInstances      int    `yaml:"minInstances"`
 	MaxInstances      int    `yaml:"maxInstances"`
+	Port              int    `yaml:"port"`
 }
 
 func LoadConfig() (Config, error) {
@@ -30,6 +31,7 @@ func LoadConfig() (Config, error) {
 		SupabaseKey:       SupabaseKey,
 		MinInstances:      0,
 		MaxInstances:      1,
+		Port:              8080,
 	}
 
 	// Start with default config
@@ -92,5 +94,8 @@ func mergeConfig(dst *Config, src Config) {
 	}
 	if src.MaxInstances != 0 {
 		dst.MaxInstances = src.MaxInstances
+	}
+	if src.Port != 0 {
+		dst.Port = src.Port
 	}
 }

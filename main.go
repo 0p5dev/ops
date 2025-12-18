@@ -28,12 +28,19 @@ func main() {
 				Action:  deploy.Deploy,
 				Flags: []cli.Flag{
 					&cli.IntFlag{
-						Name:  "min-instances",
-						Usage: "Override minimum number of instances",
+						Name:        "min-instances",
+						Usage:       "Override minimum number of instances",
+						DefaultText: "0",
 					},
 					&cli.IntFlag{
-						Name:  "max-instances",
-						Usage: "Override maximum number of instances",
+						Name:        "max-instances",
+						Usage:       "Override maximum number of instances",
+						DefaultText: "1",
+					},
+					&cli.IntFlag{
+						Name:        "port",
+						Usage:       "Override port the application listens on",
+						DefaultText: "8080",
 					},
 				},
 				Metadata: map[string]any{
