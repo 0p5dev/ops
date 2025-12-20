@@ -40,10 +40,10 @@ type SupabaseAuthResponse struct {
 	} `json:"user"`
 }
 
-func Login(ctx context.Context, cmd *cli.Command) error {
-	config := cmd.Metadata["config"].(config.Config)
-	supabaseURL := config.SupabaseURL
-	supabaseKey := config.SupabaseKey
+// PerformLogin performs the login flow programmatically
+func PerformLogin(ctx context.Context, cfg config.Config) error {
+	supabaseURL := cfg.SupabaseURL
+	supabaseKey := cfg.SupabaseKey
 
 	if supabaseURL == "" || supabaseKey == "" {
 		return fmt.Errorf("supabase URL and Key must be configured. Set SUPABASE_URL and SUPABASE_KEY environment variables")
@@ -192,6 +192,11 @@ func Login(ctx context.Context, cmd *cli.Command) error {
 		server.Shutdown(context.Background())
 		return fmt.Errorf("authentication timeout: no response received within 5 minutes")
 	}
+}
+
+func Login(ctx context.Context, cmd *cli.Command) error {
+	config := cmd.Metadata["config"].(config.Config)
+	return PerformLogin(ctx, config)
 }
 
 func getUserInfo(supabaseURL, supabaseKey, accessToken string) (*struct {

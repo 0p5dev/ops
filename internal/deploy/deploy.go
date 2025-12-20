@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 
 	"github.com/0p5dev/ops/internal/auth"
 	"github.com/0p5dev/ops/internal/config"
@@ -30,6 +31,22 @@ type CreateDeploymentRequestBody struct {
 
 type CreateDeploymentResponseBody struct {
 	ServiceUrl string `json:"service_url"`
+}
+
+func validateDeploymentName(name string) error {
+	if len(name) < 3 {
+		return fmt.Errorf("deployment name must be at least 3 characters")
+	}
+	if len(name) > 32 {
+		return fmt.Errorf("deployment name must be at most 32 characters")
+	}
+
+	matched, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$", name)
+	if !matched {
+		return fmt.Errorf("deployment name must start with a letter, contain only letters, numbers, and hyphens, and not end with a hyphen")
+	}
+
+	return nil
 }
 
 func buildContainerImage(tag string) error {
@@ -123,16 +140,41 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status code %v", resp.Status)
+		return "", fmt.Errorf("Wait a few minutes and try again.")
 	}
 
 	var respBody CreateDeploymentResponseBody
 	err = json.NewDecoder(resp.Body).Decode(&respBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode response body: %v", err)
+		respBody.ServiceUrl = "Unknown (failed to decode response)"
 	}
 
 	return respBody.ServiceUrl, nil
+}
+
+func destroyDeployment(deploymentName string, token string, config config.Config) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/deployments/%s", config.ControllerBaseUrl, deploymentName), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
+		return fmt.Errorf("authentication failed: please log in again with 'ops login'")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Status: %s", resp.Status)
+	}
+
+	return nil
 }
 
 func Deploy(ctx context.Context, cmd *cli.Command) error {
@@ -154,19 +196,115 @@ func Deploy(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("minInstances (%d) cannot be greater than maxInstances (%d)", config.MinInstances, config.MaxInstances)
 	}
 
-	token, err := auth.GetBearerToken()
-	if err != nil {
+	// Get deployment name from argument or prompt
+	var deploymentName string
+	if cmd.Args().Len() > 1 {
+		return fmt.Errorf("too many arguments: expected at most 1 deployment name, got %d", cmd.Args().Len())
+	} else if cmd.Args().Len() == 1 {
+		deploymentName = cmd.Args().First()
+		// Validate the deployment name
+		if err := validateDeploymentName(deploymentName); err != nil {
+			return fmt.Errorf("invalid deployment name: %w", err)
+		}
+	} else {
+		var err error
+		deploymentName, err = prompts.PromptName("Deployment Name")
+		if err != nil {
+			return fmt.Errorf("failed to get deployment name: %w", err)
+		}
+	}
+
+	// Try deployment with auto-login on auth failure
+	for attempt := 0; attempt < 2; attempt++ {
+		token, err := auth.GetBearerToken()
+		if err != nil {
+			if attempt == 0 {
+				fmt.Println("Authentication required. Starting login...")
+				if loginErr := auth.PerformLogin(ctx, config); loginErr != nil {
+					return fmt.Errorf("failed to login: %w", loginErr)
+				}
+				continue
+			}
+			return err
+		}
+
+		// Check if destroy flag is set
+		if cmd.Bool("destroy") {
+			confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to destroy deployment '%s'", deploymentName))
+			if err != nil {
+				return fmt.Errorf("confirmation prompt failed: %w", err)
+			}
+			if !confirmed {
+				fmt.Println("Deployment destruction cancelled")
+				return nil
+			}
+
+			err = ui.ShowSpinner("Destroying deployment...", func() error {
+				return destroyDeployment(deploymentName, token, config)
+			})
+			if err != nil && isAuthError(err) && attempt == 0 {
+				fmt.Println("Authentication failed. Starting login...")
+				if loginErr := auth.PerformLogin(ctx, config); loginErr != nil {
+					return fmt.Errorf("failed to login: %w", loginErr)
+				}
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("failed to destroy deployment: %v", err)
+			}
+			fmt.Printf("✓ Deployment '%s' destroyed successfully\n", deploymentName)
+			return nil
+		}
+
+		confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to create deployment '%s'", deploymentName))
+		if err != nil {
+			return fmt.Errorf("confirmation prompt failed: %w", err)
+		}
+		if !confirmed {
+			fmt.Println("Deployment creation cancelled")
+			return nil
+		}
+
+		err = performDeployment(ctx, deploymentName, token, config)
+		if err != nil && isAuthError(err) && attempt == 0 {
+			fmt.Println("Authentication failed. Starting login...")
+			if loginErr := auth.PerformLogin(ctx, config); loginErr != nil {
+				return fmt.Errorf("failed to login: %w", loginErr)
+			}
+			continue
+		}
 		return err
 	}
 
-	deploymentName, err := prompts.PromptName("Deployment Name")
-	if err != nil {
-		return fmt.Errorf("failed to get deployment name: %w", err)
+	return fmt.Errorf("deployment failed after retry")
+}
+
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
 	}
+	returnstr := err.Error()
+	return contains(returnstr, "authentication failed") || contains(returnstr, "unauthorized")
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func performDeployment(ctx context.Context, deploymentName string, token string, config config.Config) error {
 	filename := fmt.Sprintf("%s.tgz", deploymentName)
 
 	// Build container image with spinner
-	err = ui.ShowSpinner("Building container image...", func() error {
+	err := ui.ShowSpinner("Building container image...", func() error {
 		return buildContainerImage(deploymentName)
 	})
 	if err != nil {

@@ -23,25 +23,35 @@ func main() {
 		Usage: "A CLI tool to deploy developer-first, autoscaling applications",
 		Commands: []*cli.Command{
 			{
-				Name:    "deploy",
-				Aliases: []string{"d"},
-				Usage:   "Deploy a project",
-				Action:  deploy.Deploy,
+				Name:        "deploy",
+				Aliases:     []string{"d"},
+				Usage:       "Create, update, or destroy a deployment",
+				UsageText:   "ops deploy [options] [deployment-name]",
+				Description: "Deploy or destroy a project. If [deployment-name] is not provided, you will be prompted for it.",
+				Action:      deploy.Deploy,
 				Flags: []cli.Flag{
 					&cli.IntFlag{
 						Name:        "min-instances",
+						Aliases:     []string{"min"},
 						Usage:       "Override minimum number of instances",
 						DefaultText: "0",
 					},
 					&cli.IntFlag{
 						Name:        "max-instances",
+						Aliases:     []string{"max"},
 						Usage:       "Override maximum number of instances",
 						DefaultText: "1",
 					},
 					&cli.IntFlag{
 						Name:        "port",
+						Aliases:     []string{"p"},
 						Usage:       "Override port the application listens on",
 						DefaultText: "8080",
+					},
+					&cli.BoolFlag{
+						Name:  "destroy",
+						Usage: "Destroy a deployed application",
+						Value: false,
 					},
 				},
 				Metadata: map[string]any{

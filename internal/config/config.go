@@ -23,6 +23,13 @@ type Config struct {
 	Port              int    `yaml:"port"`
 }
 
+type ConfigFile struct {
+	ControllerBaseUrl *string `yaml:"controllerBaseUrl"`
+	MinInstances      *int    `yaml:"minInstances"`
+	MaxInstances      *int    `yaml:"maxInstances"`
+	Port              *int    `yaml:"port"`
+}
+
 func LoadConfig() (Config, error) {
 
 	defaultConfig := Config{
@@ -43,7 +50,7 @@ func LoadConfig() (Config, error) {
 		globalConfigFile := filepath.Join(homeDir, ".config", "ops", "config.yaml")
 		if _, err := os.Stat(globalConfigFile); err == nil {
 			if configData, err := os.ReadFile(globalConfigFile); err == nil {
-				var globalConfig Config
+				var globalConfig ConfigFile
 				if err := yaml.Unmarshal(configData, &globalConfig); err == nil {
 					// Merge global config into final config
 					mergeConfig(&finalConfig, globalConfig)
@@ -56,7 +63,7 @@ func LoadConfig() (Config, error) {
 	localConfigFile := "ops.config.yaml"
 	if _, err := os.Stat(localConfigFile); err == nil {
 		if configData, err := os.ReadFile(localConfigFile); err == nil {
-			var localConfig Config
+			var localConfig ConfigFile
 			if err := yaml.Unmarshal(configData, &localConfig); err == nil {
 				// Merge local config into final config (takes precedence over global)
 				mergeConfig(&finalConfig, localConfig)
@@ -84,18 +91,18 @@ func LoadConfig() (Config, error) {
 	return finalConfig, nil
 }
 
-// mergeConfig merges src config values into dst, only overwriting non-zero values
-func mergeConfig(dst *Config, src Config) {
-	if src.ControllerBaseUrl != "" {
-		dst.ControllerBaseUrl = src.ControllerBaseUrl
+// mergeConfig merges src config values into dst, only overwriting explicitly set values
+func mergeConfig(dst *Config, src ConfigFile) {
+	if src.ControllerBaseUrl != nil {
+		dst.ControllerBaseUrl = *src.ControllerBaseUrl
 	}
-	if src.MinInstances != 0 {
-		dst.MinInstances = src.MinInstances
+	if src.MinInstances != nil {
+		dst.MinInstances = *src.MinInstances
 	}
-	if src.MaxInstances != 0 {
-		dst.MaxInstances = src.MaxInstances
+	if src.MaxInstances != nil {
+		dst.MaxInstances = *src.MaxInstances
 	}
-	if src.Port != 0 {
-		dst.Port = src.Port
+	if src.Port != nil {
+		dst.Port = *src.Port
 	}
 }
