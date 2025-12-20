@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/0p5dev/ops/internal/auth"
@@ -14,7 +14,8 @@ import (
 func main() {
 	config, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	cmd := &cli.Command{
@@ -60,6 +61,7 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err)
+		slog.Error("command failed", "error", err)
+		os.Exit(1)
 	}
 }

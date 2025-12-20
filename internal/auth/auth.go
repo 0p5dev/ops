@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -48,7 +46,7 @@ func Login(ctx context.Context, cmd *cli.Command) error {
 	supabaseKey := config.SupabaseKey
 
 	if supabaseURL == "" || supabaseKey == "" {
-		return fmt.Errorf("supabase URL and Key must be configured. Set SUPABASE_URL and SUPABASE_KEY environment variables or add them to ~/.config/ops/config.json")
+		return fmt.Errorf("supabase URL and Key must be configured. Set SUPABASE_URL and SUPABASE_KEY environment variables")
 	}
 
 	// Store supabaseKey for use in callbacks
@@ -234,21 +232,6 @@ func getUserInfo(supabaseURL, supabaseKey, accessToken string) (*struct {
 	}
 
 	return &userInfo, nil
-}
-
-func openBrowser(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return fmt.Errorf("unsupported platform")
-	}
-	return cmd.Start()
 }
 
 func saveTokens(tokens AuthTokens) error {
