@@ -7,7 +7,7 @@ import (
 
 	"github.com/0p5dev/ops/internal/auth"
 	"github.com/0p5dev/ops/internal/config"
-	"github.com/0p5dev/ops/internal/deploy"
+	"github.com/0p5dev/ops/internal/deployment"
 	"github.com/urfave/cli/v3"
 )
 
@@ -23,39 +23,73 @@ func main() {
 		Usage: "A CLI tool to deploy developer-first, autoscaling applications",
 		Commands: []*cli.Command{
 			{
-				Name:        "deploy",
-				Aliases:     []string{"d"},
-				Usage:       "Create, update, or destroy a deployment",
-				UsageText:   "ops deploy [options] [deployment-name]",
-				Description: "Deploy or destroy a project. If [deployment-name] is not provided, you will be prompted for it.",
-				Action:      deploy.Deploy,
-				Flags: []cli.Flag{
-					&cli.IntFlag{
-						Name:        "min-instances",
-						Aliases:     []string{"min"},
-						Usage:       "Override minimum number of instances",
-						DefaultText: "0",
-					},
-					&cli.IntFlag{
-						Name:        "max-instances",
-						Aliases:     []string{"max"},
-						Usage:       "Override maximum number of instances",
-						DefaultText: "1",
-					},
-					&cli.IntFlag{
-						Name:        "port",
-						Aliases:     []string{"p"},
-						Usage:       "Override port the application listens on",
-						DefaultText: "8080",
-					},
-					&cli.BoolFlag{
-						Name:  "destroy",
-						Usage: "Destroy a deployed application",
-						Value: false,
-					},
-				},
+				Name:    "deployment",
+				Aliases: []string{"deploy", "d"},
+				Usage:   "Manage deployments",
 				Metadata: map[string]any{
 					"config": config,
+				},
+				Commands: []*cli.Command{
+					{
+						Name:    "create",
+						Aliases: []string{"c"},
+						Usage:   "Create a deployment",
+						Action:  deployment.Create,
+						Metadata: map[string]any{
+							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.IntFlag{
+								Name:        "min-instances",
+								Aliases:     []string{"min"},
+								Usage:       "Override minimum number of instances",
+								DefaultText: "0",
+							},
+							&cli.IntFlag{
+								Name:        "max-instances",
+								Aliases:     []string{"max"},
+								Usage:       "Override maximum number of instances",
+								DefaultText: "1",
+							},
+							&cli.IntFlag{
+								Name:        "port",
+								Aliases:     []string{"p"},
+								Usage:       "Override port the application listens on",
+								DefaultText: "8080",
+							},
+							&cli.StringFlag{
+								Name:    "file",
+								Aliases: []string{"f"},
+								Usage:   "Path to Dockerfile or Containerfile",
+							},
+						},
+					},
+					{
+						Name:    "list",
+						Aliases: []string{"l"},
+						Usage:   "List all deployments",
+						Action:  deployment.List,
+						Metadata: map[string]any{
+							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "output",
+								Aliases: []string{"o"},
+								Usage:   "Output format: table, json, or yaml",
+								Value:   "table",
+							},
+						},
+					},
+					{
+						Name:    "destroy",
+						Aliases: []string{"d"},
+						Usage:   "Destroy a deployment",
+						Action:  deployment.Destroy,
+						Metadata: map[string]any{
+							"config": config,
+						},
+					},
 				},
 			},
 			{

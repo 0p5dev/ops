@@ -1,4 +1,4 @@
-package selects
+package prompts
 
 import (
 	"fmt"
