@@ -62,6 +62,12 @@ func main() {
 								Aliases: []string{"f"},
 								Usage:   "Path to Dockerfile or Containerfile",
 							},
+							&cli.StringFlag{
+								Name:    "context",
+								Aliases: []string{"c"},
+								Usage:   "Docker build context path",
+								Value:   ".",
+							},
 						},
 					},
 					{

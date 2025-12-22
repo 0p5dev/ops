@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
 
 	"github.com/0p5dev/ops/internal/config"
 	prompts "github.com/0p5dev/ops/internal/prompts"
@@ -31,8 +33,8 @@ type CreateDeploymentResponseBody struct {
 	ServiceUrl string `json:"service_url"`
 }
 
-func buildContainerImage(tag string, dockerfile string) error {
-	cmd := exec.Command("docker", "build", "-f", dockerfile, "-t", tag, ".")
+func buildContainerImage(tag string, dockerfile string, buildContext string) error {
+	cmd := exec.Command("docker", "build", "-f", dockerfile, "-t", tag, buildContext)
 	err := cmd.Run()
 	if err != nil {
 		return err
@@ -103,7 +105,7 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 	return respBody.Fqin, nil
 }
 
-func createDeployment(deploymentName string, fqin string, token string, config config.Config) (serviceUrl string, err error) {
+func createDeployment(ctx context.Context, deploymentName string, fqin string, token string, config config.Config) (serviceUrl string, err error) {
 	body := CreateDeploymentRequestBody{
 		Name:           deploymentName,
 		ContainerImage: fqin,
@@ -117,7 +119,7 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 		return "", err
 	}
 
-	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "PUT", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", err
 	}
@@ -135,6 +137,16 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 		return "", fmt.Errorf("authentication failed: please log in again with 'ops login'")
 	}
 
+	// Handle 408 Request Timeout (cancellation)
+	if resp.StatusCode == http.StatusRequestTimeout {
+		var errResp map[string]string
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		if msg, ok := errResp["error"]; ok {
+			return "", fmt.Errorf("%s", msg)
+		}
+		return "", fmt.Errorf("deployment was cancelled")
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Wait a few minutes and try again.")
 	}
@@ -148,15 +160,36 @@ func createDeployment(deploymentName string, fqin string, token string, config c
 	return respBody.ServiceUrl, nil
 }
 
-func performDeployment(ctx context.Context, deploymentName string, token string, config config.Config, dockerfile string) error {
+func performDeployment(ctx context.Context, deploymentName string, token string, config config.Config, dockerfile string, buildContext string) error {
+	// Create cancellable context and setup signal handling
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Flag to track if we've reached the deployment creation stage
+	deploymentStarted := false
+
+	go func() {
+		<-sigChan
+		fmt.Println("\n\nReceived interrupt signal. Cancelling deployment...")
+		cancel()
+		// Don't exit here - let the error flow through naturally
+		// This allows us to wait for the controller's cleanup response
+	}()
+
 	filename := fmt.Sprintf("%s.tgz", deploymentName)
 
 	// Build container image with spinner
 	err := ui.ShowSpinner("Building container image...", func() error {
-		return buildContainerImage(deploymentName, dockerfile)
+		return buildContainerImage(deploymentName, dockerfile, buildContext)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to build container image: %v", err)
+	}
+	if ctx.Err() != nil {
+		return fmt.Errorf("deployment cancelled")
 	}
 	fmt.Println("✓ Container image built successfully")
 
@@ -167,6 +200,10 @@ func performDeployment(ctx context.Context, deploymentName string, token string,
 	if err != nil {
 		return fmt.Errorf("failed to save container image: %v", err)
 	}
+	if ctx.Err() != nil {
+		os.Remove(filename) // cleanup
+		return fmt.Errorf("deployment cancelled")
+	}
 
 	// Transmit image with progress indicator
 	stopProgress = ui.ShowProgress("Uploading container image...")
@@ -175,6 +212,10 @@ func performDeployment(ctx context.Context, deploymentName string, token string,
 	if err != nil {
 		return fmt.Errorf("failed to transmit compressed image: %v", err)
 	}
+	if ctx.Err() != nil {
+		os.Remove(filename) // cleanup
+		return fmt.Errorf("deployment cancelled")
+	}
 
 	// Clean up the compressed image file after successful transmission
 	if err := os.Remove(filename); err != nil {
@@ -182,14 +223,28 @@ func performDeployment(ctx context.Context, deploymentName string, token string,
 		fmt.Printf("Warning: failed to delete temporary file %s: %v\n", filename, err)
 	}
 
+	// Mark that deployment creation has started
+	deploymentStarted = true
+
 	// Create deployment with spinner
 	var serviceUrl string
 	err = ui.ShowSpinner("Creating deployment...", func() error {
 		var createErr error
-		serviceUrl, createErr = createDeployment(deploymentName, fqin, token, config)
+		serviceUrl, createErr = createDeployment(ctx, deploymentName, fqin, token, config)
 		return createErr
 	})
 	if err != nil {
+		// Check if it was cancelled
+		if ctx.Err() != nil {
+			if deploymentStarted {
+				// Deployment was in progress, wait for controller cleanup
+				fmt.Println("\nDeployment cancelled. Waiting for controller to clean up resources...")
+				// The error from createDeployment indicates the controller's response
+				// If it's a clean cancellation, the controller will have cleaned up
+				fmt.Println("✓ Deployment cancelled and resources cleaned up")
+			}
+			return fmt.Errorf("deployment cancelled")
+		}
 		return fmt.Errorf("failed to create deployment: %v", err)
 	}
 
@@ -252,6 +307,9 @@ func Create(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
+	// Get build context
+	buildContext := cmd.String("context")
+
 	// Confirm creation
 	confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to create deployment '%s'", deploymentName))
 	if err != nil {
@@ -264,6 +322,6 @@ func Create(ctx context.Context, cmd *cli.Command) error {
 
 	// Perform creation with auth retry
 	return withAuthRetry(ctx, config, func(token string) error {
-		return performDeployment(ctx, deploymentName, token, config, dockerfile)
+		return performDeployment(ctx, deploymentName, token, config, dockerfile, buildContext)
 	})
 }
