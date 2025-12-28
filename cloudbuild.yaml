@@ -1,51 +1,64 @@
 steps:
-  # Build the Go binary
-  - id: Build go binary
-    name: golang:1.25-trixie
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        go build -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$$NUXT_PUBLIC_SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$$NUXT_PUBLIC_SUPABASE_API_KEY" -o ops_linux_amd64 .
-    env:
-      - "GOOS=linux"
-      - "CGO_ENABLED=0"
-      - "GOARCH=amd64"
-    secretEnv:
-      - NUXT_PUBLIC_SUPABASE_API_KEY
-      - NUXT_PUBLIC_SUPABASE_URL
+  # # Build the Go binary
+  # - id: Build go binary
+  #   name: golang:1.25-trixie
+  #   entrypoint: "bash"
+  #   args:
+  #     - "-c"
+  #     - |
+  #       go build -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$$SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$$SUPABASE_API_KEY" -o ops_linux_amd64 .
+  #   env:
+  #     - "GOOS=linux"
+  #     - "CGO_ENABLED=0"
+  #     - "GOARCH=amd64"
+  #   secretEnv:
+  #     - SUPABASE_API_KEY
+  #     - SUPABASE_URL
 
-  # Compress the binary into a .tgz file
-  - id: Compress binary
-    name: alpine:latest
-    entrypoint: "sh"
-    args:
-      - "-c"
-      - |
-        tar -czf ops_linux_amd64.tgz ops_linux_amd64
+  # # Compress the binary into a .tgz file
+  # - id: Compress binary
+  #   name: alpine:latest
+  #   entrypoint: "sh"
+  #   args:
+  #     - "-c"
+  #     - |
+  #       tar -czf ops_linux_amd64.tgz ops_linux_amd64
 
-  # Retrieve the github access token from Secret Manager and inject it as an env variable
-  - id: Retrieve GitHub access Token
-    name: gcr.io/cloud-builders/gcloud
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
-        echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
+  # # Retrieve the github access token from Secret Manager and inject it as an env variable
+  # - id: Retrieve GitHub access Token
+  #   name: gcr.io/cloud-builders/gcloud
+  #   entrypoint: "bash"
+  #   args:
+  #     - "-c"
+  #     - |
+  #       GITHUB_ACCESS_TOKEN=$(gcloud secrets versions access latest --secret="ops-github-access-token")
+  #       echo "export GITHUB_ACCESS_TOKEN=$$GITHUB_ACCESS_TOKEN" >> /workspace/env.sh
 
-  # Create new github release and upload the built binary as release asset
-  - id: Create GitHub Release
-    name: gcr.io/cloud-builders/gcloud
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        apt-get update && apt-get install -y curl jq
-        source /workspace/env.sh
-        RELEASE_RESPONSE=$$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"$TAG_NAME","draft":false}')
-        UPLOAD_URL=$$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
-        curl --http1.1 -X POST "$$UPLOAD_URL?name=ops_linux_amd64.tgz" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops_linux_amd64.tgz"
+  # # Create new github release and upload the built binary as release asset
+  # - id: Create GitHub Release
+  #   name: gcr.io/cloud-builders/gcloud
+  #   entrypoint: "bash"
+  #   args:
+  #     - "-c"
+  #     - |
+  #       apt-get update && apt-get install -y curl jq
+  #       source /workspace/env.sh
+  #       RELEASE_RESPONSE=$$(curl --http1.1 -X POST https://api.github.com/repos/0p5dev/ops/releases -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"tag_name":"$TAG_NAME","name":"$TAG_NAME","draft":false}')
+  #       UPLOAD_URL=$$(echo $$RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
+  #       curl --http1.1 -X POST "$$UPLOAD_URL?name=ops_linux_amd64.tgz" -H "Authorization: token $$GITHUB_ACCESS_TOKEN" -H "Content-Type: application/octet-stream" --data-binary "@/workspace/ops_linux_amd64.tgz"
+
+  # Setup the workspace so we have a viable place to point GOPATH at.
+  - name: gcr.io/cloud-builders/go
+    env: ["PROJECT_ROOT=github.com/0p5dev/ops"]
+    args: ["env"]
+
+  # Create github release.
+  - name: goreleaser/goreleaser
+    entrypoint: /bin/sh
+    dir: gopath/src/github.com
+    env: ["GOPATH=/workspace/gopath"]
+    args: ["-c", "cd 0p5dev/ops && git tag $TAG_NAME && /goreleaser"]
+    secretEnv: ["GITHUB_TOKEN"]
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
 
@@ -61,6 +74,8 @@ tags:
 availableSecrets:
   secretManager:
     - versionName: projects/160851347747/secrets/ops-controller-supabase-url/versions/1
-      env: "NUXT_PUBLIC_SUPABASE_URL"
+      env: "SUPABASE_URL"
     - versionName: projects/160851347747/secrets/ops-controller-supabase-anon-public-key/versions/1
-      env: "NUXT_PUBLIC_SUPABASE_API_KEY"
+      env: "SUPABASE_API_KEY"
+    - versionName: projects/160851347747/secrets/ops-github-access-token/versions/1
+      env: "GITHUB_TOKEN"
