@@ -58,7 +58,10 @@ steps:
     dir: gopath/src/github.com
     env: ["GOPATH=/workspace/gopath"]
     args: ["-c", "cd 0p5dev/ops && git tag $TAG_NAME && /goreleaser"]
-    secretEnv: ["GITHUB_TOKEN"]
+    secretEnv:
+      - SUPABASE_URL
+      - SUPABASE_API_KEY
+      - GITHUB_TOKEN
 
 serviceAccount: projects/local-first-476300/serviceAccounts/cloud-build-sa@local-first-476300.iam.gserviceaccount.com
 
