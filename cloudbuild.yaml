@@ -57,7 +57,7 @@ steps:
     entrypoint: /bin/sh
     dir: gopath/src/github.com
     env: ["GOPATH=/workspace/gopath"]
-    args: ["-c", "cd 0p5dev/ops && git tag $TAG_NAME && /goreleaser"]
+    args: ["-c", "cd 0p5dev/ops && git tag $TAG_NAME && goreleaser"]
     secretEnv:
       - SUPABASE_URL
       - SUPABASE_API_KEY
