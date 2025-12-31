@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/0p5dev/ops/internal/config"
+	"github.com/0p5dev/ops/internal/prompts"
 )
 
 type AuthTokens struct {
@@ -47,6 +48,12 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 
 	if supabaseURL == "" || supabaseKey == "" {
 		return fmt.Errorf("supabase URL and Key must be configured. Set SUPABASE_URL and SUPABASE_KEY environment variables")
+	}
+
+	// Prompt user to select provider using prompts package
+	provider, err := prompts.PromptProviderSelection()
+	if err != nil {
+		return fmt.Errorf("failed to select provider: %w", err)
 	}
 
 	// Store supabaseKey for use in callbacks
@@ -148,11 +155,11 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 		}
 	}()
 
-	// Generate OAuth URL for GitHub
+	// Generate OAuth URL for selected provider
 	redirectURL := "http://localhost:54321/callback"
-	authURL := fmt.Sprintf("%s/auth/v1/authorize?provider=github&redirect_to=%s", supabaseURL, url.QueryEscape(redirectURL))
+	authURL := fmt.Sprintf("%s/auth/v1/authorize?provider=%s&redirect_to=%s", supabaseURL, provider, url.QueryEscape(redirectURL))
 
-	fmt.Println("Please visit this URL to authenticate with GitHub:")
+	fmt.Println("Please visit this URL to authenticate with", provider, ":")
 	fmt.Println(authURL)
 
 	// Wait for callback or timeout

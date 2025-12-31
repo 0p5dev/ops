@@ -49,3 +49,21 @@ func PromptConfirmation(message string) (bool, error) {
 	}
 	return result == "y" || result == "Y", nil
 }
+
+func PromptProviderSelection() (string, error) {
+	prompt := promptui.Select{
+		Label: "Select authentication provider",
+		Items: []string{"GitHub", "Google"},
+	}
+	idx, _, err := prompt.Run()
+	if err != nil {
+		return "", fmt.Errorf("prompt failed %v", err)
+	}
+	// Return lowercase provider for use in URL
+	if idx == 0 {
+		return "github", nil
+	} else if idx == 1 {
+		return "google", nil
+	}
+	return "", fmt.Errorf("invalid provider selection")
+}
