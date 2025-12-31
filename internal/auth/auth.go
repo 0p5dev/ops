@@ -66,28 +66,13 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 	// Start local server to handle OAuth callback
 	server := &http.Server{Addr: ":54321"}
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		// Supabase redirects with hash fragment, we need to parse it from the URL
-		// The frontend would normally handle this, but we'll extract from query params
 		accessToken := r.URL.Query().Get("access_token")
 		refreshToken := r.URL.Query().Get("refresh_token")
 		expiresIn := r.URL.Query().Get("expires_in")
 
 		if accessToken == "" {
-			// Try to get from hash fragment (this won't work directly in Go, need JS redirect)
-			fmt.Fprintf(w, `<html><body><script>
-				const hash = window.location.hash.substring(1);
-				const params = new URLSearchParams(hash);
-				const accessToken = params.get('access_token');
-				const refreshToken = params.get('refresh_token');
-				const expiresIn = params.get('expires_in');
-				if (accessToken) {
-					window.location.href = '/token?access_token=' + accessToken + 
-						'&refresh_token=' + refreshToken + 
-						'&expires_in=' + expiresIn;
-				} else {
-					document.body.innerHTML = '<h1>Authentication failed</h1><p>No access token received.</p>';
-				}
-			</script></body></html>`)
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<!DOCTYPE html><html><head><title>0p5.dev Auth</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><script>const hash = window.location.hash.substring(1);const params = new URLSearchParams(hash);const accessToken = params.get('access_token');const refreshToken = params.get('refresh_token');const expiresIn = params.get('expires_in');if (accessToken) {window.location.href = '/token?access_token=' + accessToken + '&refresh_token=' + refreshToken + '&expires_in=' + expiresIn;} else {document.body.innerHTML = "<h1>0p5.dev</h1><h1>Authentication failed</h1><p>No access token received.</p>";}</script></body></html>`))
 			return
 		}
 
@@ -99,7 +84,8 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 		userInfo, err := getUserInfo(supabaseURL, supabaseAnonKey, accessToken)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to get user info: %w", err)
-			fmt.Fprintf(w, "<html><body><h1>Authentication failed</h1><p>Failed to retrieve user information.</p></body></html>")
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<!DOCTYPE html><html><head><title>Authentication failed</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><h1>0p5.dev</h1><h1>Authentication failed</h1><p>Failed to retrieve user information.</p></body></html>`))
 			return
 		}
 
@@ -112,7 +98,8 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 		}
 
 		responseChan <- response
-		fmt.Fprintf(w, "<html><body><h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p></body></html>")
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Authentication successful!</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><h1>0p5.dev</h1><h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`))
 	})
 
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +109,8 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 
 		if accessToken == "" {
 			errChan <- fmt.Errorf("no access token received")
-			fmt.Fprintf(w, "<html><body><h1>Authentication failed</h1><p>No access token received.</p></body></html>")
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<!DOCTYPE html><html><head><title>Authentication failed</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><h1>0p5.dev</h1><h1>Authentication failed</h1><p>No access token received.</p></body></html>`))
 			return
 		}
 
@@ -133,7 +121,8 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 		userInfo, err := getUserInfo(supabaseURL, supabaseAnonKey, accessToken)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to get user info: %w", err)
-			fmt.Fprintf(w, "<html><body><h1>Authentication failed</h1><p>Failed to retrieve user information.</p></body></html>")
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<!DOCTYPE html><html><head><title>Authentication failed</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><h1>0p5.dev</h1><h1>Authentication failed</h1><p>Failed to retrieve user information.</p></body></html>`))
 			return
 		}
 
@@ -146,7 +135,8 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 		}
 
 		responseChan <- response
-		fmt.Fprintf(w, "<html><body><h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p></body></html>")
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Authentication successful!</title><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");body{text-align:center;margin-top:10vh;background:#18181b;color:white;}h1:first-of-type{font-family:'Chakra Petch',sans-serif;font-size:4rem;font-weight:400;}</style></head><body><h1>0p5.dev</h1><h1>Authentication successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`))
 	})
 
 	go func() {
