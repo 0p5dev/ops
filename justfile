@@ -42,4 +42,4 @@ release *MESSAGE:
     
     echo "Creating new tag: $NEW_TAG with message: {{MESSAGE}}"
     git tag -a "$NEW_TAG" -m "{{MESSAGE}}"
-    git push 0p5 "$NEW_TAG"
+    git push origin "$NEW_TAG"
