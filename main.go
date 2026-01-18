@@ -88,10 +88,41 @@ func main() {
 						},
 					},
 					{
-						Name:    "destroy",
-						Aliases: []string{"d"},
-						Usage:   "Destroy a deployment",
-						Action:  deployment.Destroy,
+						Name:   "destroy",
+						Usage:  "Destroy a deployment",
+						Action: deployment.Destroy,
+						Metadata: map[string]any{
+							"config": config,
+						},
+					},
+					{
+						Name:    "scale",
+						Aliases: []string{"s"},
+						Usage:   "Scale a deployment's minimum and maximum instances",
+						Action:  deployment.Scale,
+						Metadata: map[string]any{
+							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.Int32Flag{
+								Name:        "min-instances",
+								Aliases:     []string{"min"},
+								Usage:       "Minimum number of instances",
+								DefaultText: "prompt if not provided",
+							},
+							&cli.Int32Flag{
+								Name:        "max-instances",
+								Aliases:     []string{"max"},
+								Usage:       "Maximum number of instances",
+								DefaultText: "prompt if not provided",
+							},
+						},
+					},
+					{
+						Name:    "describe",
+						Aliases: []string{"d", "get"},
+						Usage:   "Get details of a deployment",
+						Action:  deployment.Describe,
 						Metadata: map[string]any{
 							"config": config,
 						},

@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/0p5dev/ops/internal/config"
 	"github.com/urfave/cli/v3"
-	"gopkg.in/yaml.v3"
 )
 
 type Deployment struct {
@@ -113,17 +111,4 @@ func outputTable(deployments []Deployment) error {
 
 	fmt.Printf("\nTotal: %d deployment(s)\n", len(deployments))
 	return nil
-}
-
-func outputJSON(deployments []Deployment) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(deployments)
-}
-
-func outputYAML(deployments []Deployment) error {
-	encoder := yaml.NewEncoder(os.Stdout)
-	encoder.SetIndent(2)
-	defer encoder.Close()
-	return encoder.Encode(deployments)
 }

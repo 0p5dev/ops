@@ -2,11 +2,14 @@ package deployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 
 	"github.com/0p5dev/ops/internal/auth"
 	"github.com/0p5dev/ops/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 // validateDeploymentName validates that a deployment name meets requirements
@@ -77,4 +80,17 @@ func withAuthRetry(ctx context.Context, config config.Config, fn func(token stri
 	}
 
 	return fmt.Errorf("operation failed after retry")
+}
+
+func outputJSON[T any](data T) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
+}
+
+func outputYAML[T any](data T) error {
+	encoder := yaml.NewEncoder(os.Stdout)
+	encoder.SetIndent(2)
+	defer encoder.Close()
+	return encoder.Encode(data)
 }

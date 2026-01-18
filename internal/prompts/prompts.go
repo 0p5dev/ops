@@ -3,6 +3,7 @@ package prompts
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/manifoldco/promptui"
 )
@@ -66,4 +67,34 @@ func PromptProviderSelection() (string, error) {
 		return "google", nil
 	}
 	return "", fmt.Errorf("invalid provider selection")
+}
+
+// PromptForInt prompts the user for an integer value within a range
+func PromptForInt(label string, min, max int) (int, error) {
+	validate := func(input string) error {
+		val, err := strconv.Atoi(input)
+		if err != nil {
+			return fmt.Errorf("please enter a valid number")
+		}
+		if val < min {
+			return fmt.Errorf("value must be at least %d", min)
+		}
+		if val > max {
+			return fmt.Errorf("value must be at most %d", max)
+		}
+		return nil
+	}
+
+	prompt := promptui.Prompt{
+		Label:    fmt.Sprintf("%s (%d-%d)", label, min, max),
+		Validate: validate,
+		Default:  strconv.Itoa(min),
+	}
+
+	result, err := prompt.Run()
+	if err != nil {
+		return 0, fmt.Errorf("prompt failed: %v", err)
+	}
+
+	return strconv.Atoi(result)
 }
