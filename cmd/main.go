@@ -126,6 +126,14 @@ func main() {
 						Metadata: map[string]any{
 							"config": config,
 						},
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "output",
+								Aliases: []string{"o"},
+								Usage:   "Output format: table, json, or yaml",
+								Value:   "table",
+							},
+						},
 					},
 				},
 			},

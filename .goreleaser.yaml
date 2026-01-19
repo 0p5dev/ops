@@ -17,6 +17,7 @@ builds:
     ldflags:
       - -X github.com/0p5dev/ops/internal/config.SupabaseURL={{ .Env.SUPABASE_URL }}
       - -X github.com/0p5dev/ops/internal/config.SupabaseKey={{ .Env.SUPABASE_API_KEY }}
+    main: ./cmd
 
 archives:
   - formats: [tar.gz]
@@ -44,8 +45,3 @@ release:
   github:
     owner: 0p5dev
     name: ops
-  footer: >-
-
-    ---
-
-    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).

@@ -21,7 +21,7 @@ type DeploymentDetails struct {
 	CreatedTime string            `json:"created_time"`
 	UpdatedTime string            `json:"updated_time"`
 	Scaling     DeploymentScaling `json:"scaling"`
-	Metrics     DeploymentMetrics `json:"metrics"`
+	// Metrics     DeploymentMetrics `json:"metrics"`
 }
 
 type DeploymentScaling struct {

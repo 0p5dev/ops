@@ -7,10 +7,10 @@ fmt:
     go fmt ./...
 
 run:
-    go run main.go
+    go run cmd/main.go
 
 build:
-    go build -o ops main.go
+    go build -o ops cmd/main.go
 
 tidy:
     go mod tidy
@@ -19,8 +19,7 @@ add PACKAGE:
     go get -u {{PACKAGE}}
 
 install:
-    go install -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$SUPABASE_API_KEY"
-
+    go install -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$SUPABASE_API_KEY" ./cmd
 release *MESSAGE:
     #!/usr/bin/env bash
     set -euo pipefail
