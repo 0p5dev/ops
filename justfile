@@ -19,7 +19,7 @@ add PACKAGE:
     go get -u {{PACKAGE}}
 
 install:
-    go install -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$SUPABASE_API_KEY" ./cmd
+    go build -o $HOME/go/bin/ops -ldflags "-X github.com/0p5dev/ops/internal/config.SupabaseURL=$SUPABASE_URL -X github.com/0p5dev/ops/internal/config.SupabaseKey=$SUPABASE_API_KEY" ./cmd
 release *MESSAGE:
     #!/usr/bin/env bash
     set -euo pipefail

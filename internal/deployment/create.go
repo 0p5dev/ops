@@ -35,9 +35,19 @@ type CreateDeploymentResponseBody struct {
 
 func buildContainerImage(tag string, dockerfile string, buildContext string) error {
 	cmd := exec.Command("docker", "build", "-f", dockerfile, "-t", tag, buildContext)
+
+	// Capture both stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
 	err := cmd.Run()
 	if err != nil {
-		return err
+		// Include the stderr output in the error message
+		if stderr.Len() > 0 {
+			return fmt.Errorf("docker build failed: %v\n%s", err, stderr.String())
+		}
+		return fmt.Errorf("docker build failed: %v", err)
 	}
 
 	return nil
@@ -59,9 +69,19 @@ func detectDockerfile() (string, error) {
 
 func saveContainerImage(tag string, filename string) error {
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("docker save %s | gzip > %s", tag, filename))
+
+	// Capture both stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
 	err := cmd.Run()
 	if err != nil {
-		return err
+		// Include the stderr output in the error message
+		if stderr.Len() > 0 {
+			return fmt.Errorf("docker save failed: %v\n%s", err, stderr.String())
+		}
+		return fmt.Errorf("docker save failed: %v", err)
 	}
 
 	return nil
