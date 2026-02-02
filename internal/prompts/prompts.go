@@ -70,7 +70,7 @@ func PromptProviderSelection() (string, error) {
 }
 
 // PromptForInt prompts the user for an integer value within a range
-func PromptForInt(label string, min, max int) (int, error) {
+func PromptForInt(label string, min, max, defaultValue int) (int, error) {
 	validate := func(input string) error {
 		val, err := strconv.Atoi(input)
 		if err != nil {
@@ -85,10 +85,21 @@ func PromptForInt(label string, min, max int) (int, error) {
 		return nil
 	}
 
+	// Use 8080 as default for port, otherwise use min
+	if label == "Port" {
+		// Ensure the default is within the valid range
+		if defaultValue < min {
+			defaultValue = min
+		}
+		if defaultValue > max {
+			defaultValue = max
+		}
+	}
+
 	prompt := promptui.Prompt{
 		Label:    fmt.Sprintf("%s (%d-%d)", label, min, max),
 		Validate: validate,
-		Default:  strconv.Itoa(min),
+		Default:  strconv.Itoa(defaultValue),
 	}
 
 	result, err := prompt.Run()

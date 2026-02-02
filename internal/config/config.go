@@ -31,7 +31,6 @@ type ConfigFile struct {
 }
 
 func LoadConfig() (Config, error) {
-
 	defaultConfig := Config{
 		ControllerBaseUrl: "http://34.58.48.78",
 		SupabaseURL:       SupabaseURL,

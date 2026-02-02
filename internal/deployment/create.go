@@ -287,6 +287,11 @@ func Create(ctx context.Context, cmd *cli.Command) error {
 	if cmd.IsSet("port") {
 		config.Port = cmd.Int("port")
 	}
+	var err error
+	config.Port, err = prompts.PromptForInt("Port", 1, 65535, config.Port)
+	if err != nil {
+		return fmt.Errorf("failed to get port: %w", err)
+	}
 
 	// Validate after flag overrides
 	if config.MinInstances > config.MaxInstances {
@@ -331,7 +336,7 @@ func Create(ctx context.Context, cmd *cli.Command) error {
 	buildContext := cmd.String("context")
 
 	// Confirm creation
-	confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to create deployment '%s'", deploymentName))
+	confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to create deployment '%s' exposed on port %d?", deploymentName, config.Port))
 	if err != nil {
 		return fmt.Errorf("confirmation prompt failed: %w", err)
 	}

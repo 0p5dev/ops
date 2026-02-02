@@ -40,7 +40,7 @@ func Scale(ctx context.Context, cmd *cli.Command) error {
 	if cmd.IsSet("min-instances") {
 		minInstances = cmd.Int32("min-instances")
 	} else {
-		val, err := prompts.PromptForInt("Minimum instances", 0, 10)
+		val, err := prompts.PromptForInt("Minimum instances", 0, 10, 0)
 		if err != nil {
 			return fmt.Errorf("failed to get minimum instances: %w", err)
 		}
@@ -50,7 +50,7 @@ func Scale(ctx context.Context, cmd *cli.Command) error {
 	if cmd.IsSet("max-instances") {
 		maxInstances = cmd.Int32("max-instances")
 	} else {
-		val, err := prompts.PromptForInt("Maximum instances", int(minInstances), 10)
+		val, err := prompts.PromptForInt("Maximum instances", int(minInstances), 10, int(minInstances))
 		if err != nil {
 			return fmt.Errorf("failed to get maximum instances: %w", err)
 		}

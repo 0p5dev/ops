@@ -21,9 +21,9 @@ func validateDeploymentName(name string) error {
 		return fmt.Errorf("deployment name must be at most 32 characters")
 	}
 
-	matched, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$", name)
+	matched, _ := regexp.MatchString("^[a-z][a-z0-9-]*[a-z0-9]$", name)
 	if !matched {
-		return fmt.Errorf("deployment name must start with a letter, contain only letters, numbers, and hyphens, and not end with a hyphen")
+		return fmt.Errorf("deployment name must start with a letter, contain only lowercase letters, numbers, and hyphens, and not end with a hyphen")
 	}
 
 	return nil

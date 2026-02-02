@@ -38,6 +38,11 @@ release *MESSAGE:
     
     NEW_PATCH=$((PATCH + 1))
     NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+    echo "Pushing to main branch"
+    git add -A
+    git commit -m "{{MESSAGE}}"
+    git push origin main
     
     echo "Creating new tag: $NEW_TAG with message: {{MESSAGE}}"
     git tag -a "$NEW_TAG" -m "{{MESSAGE}}"
