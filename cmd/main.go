@@ -68,6 +68,16 @@ func main() {
 								Usage:   "Docker build context path",
 								Value:   ".",
 							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the deployment to complete",
+							},
 						},
 					},
 					{
