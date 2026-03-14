@@ -137,7 +137,7 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 	return respBody.Fqin, nil
 }
 
-func createDeployment(ctx context.Context, deploymentName string, fqin string, token string, config config.Config) (serviceUrl string, err error) {
+func createDeployment(ctx context.Context, deploymentName string, fqin string, token string, config config.Config, noWait bool) (serviceUrl string, err error) {
 	min := config.MinInstances
 	max := config.MaxInstances
 	port := config.Port
@@ -192,6 +192,10 @@ func createDeployment(ctx context.Context, deploymentName string, fqin string, t
 		return "", fmt.Errorf("failed to retrieve job_id, cannot watch deployment progress: %v", err)
 	}
 	resp.Body.Close()
+
+	if noWait {
+		return "", nil
+	}
 
 	streamReq, err := http.NewRequestWithContext(
 		ctx,
@@ -268,16 +272,13 @@ func createDeployment(ctx context.Context, deploymentName string, fqin string, t
 	return "", fmt.Errorf("provisioning stream closed before message event")
 }
 
-func performDeployment(ctx context.Context, deploymentName string, token string, config config.Config, dockerfile string, buildContext string) error {
+func performDeployment(ctx context.Context, deploymentName string, token string, config config.Config, dockerfile string, buildContext string, noWait bool) error {
 	// Create cancellable context and setup signal handling
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	// Flag to track if we've reached the deployment creation stage
-	deploymentStarted := false
 
 	go func() {
 		<-sigChan
@@ -331,32 +332,26 @@ func performDeployment(ctx context.Context, deploymentName string, token string,
 		fmt.Printf("Warning: failed to delete temporary file %s: %v\n", filename, err)
 	}
 
-	// Mark that deployment creation has started
-	deploymentStarted = true
-
 	// Create deployment with spinner
 	var serviceUrl string
 	err = ui.ShowSpinner("Creating deployment...", func() error {
 		var createErr error
-		serviceUrl, createErr = createDeployment(ctx, deploymentName, fqin, token, config)
+		serviceUrl, createErr = createDeployment(ctx, deploymentName, fqin, token, config, noWait)
 		return createErr
 	})
 	if err != nil {
 		// Check if it was cancelled
 		if ctx.Err() != nil {
-			if deploymentStarted {
-				// Deployment was in progress, wait for controller cleanup
-				fmt.Println("\nDeployment cancelled. Waiting for controller to clean up resources...")
-				// The error from createDeployment indicates the controller's response
-				// If it's a clean cancellation, the controller will have cleaned up
-				fmt.Println("✓ Deployment cancelled and resources cleaned up")
-			}
 			return fmt.Errorf("deployment cancelled")
 		}
 		return fmt.Errorf("failed to create deployment: %v", err)
 	}
 
-	fmt.Println("Deployment successful! Your service is available at: ", serviceUrl)
+	if noWait {
+		fmt.Println("✓ Deployment pending. Run 'ops deployment list' or 'ops deployment describe " + deploymentName + "' to check status.")
+	} else {
+		fmt.Println("✓ Deployment successful! Your service is available at: ", serviceUrl)
+	}
 
 	return nil
 }
@@ -440,6 +435,6 @@ func Create(ctx context.Context, cmd *cli.Command) error {
 
 	// Perform creation with auth retry
 	return withAuthRetry(ctx, config, func(token string) error {
-		return performDeployment(ctx, deploymentName, token, config, dockerfile, buildContext)
+		return performDeployment(ctx, deploymentName, token, config, dockerfile, buildContext, cmd.Bool("no-wait"))
 	})
 }

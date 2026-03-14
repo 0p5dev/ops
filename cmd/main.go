@@ -19,8 +19,9 @@ func main() {
 	}
 
 	cmd := &cli.Command{
-		Name:  "ops",
-		Usage: "A CLI tool to deploy developer-first, autoscaling applications",
+		Name:                   "ops",
+		Usage:                  "A CLI tool to deploy developer-first, autoscaling applications",
+		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			{
 				Name:    "deployment",
@@ -103,6 +104,13 @@ func main() {
 						Action: deployment.Destroy,
 						Metadata: map[string]any{
 							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
 						},
 					},
 					{
