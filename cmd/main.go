@@ -82,6 +82,56 @@ func main() {
 						},
 					},
 					{
+						Name:    "update",
+						Aliases: []string{"u"},
+						Usage:   "Update a deployment",
+						Action:  deployment.Update,
+						Metadata: map[string]any{
+							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.IntFlag{
+								Name:        "min-instances",
+								Aliases:     []string{"min"},
+								Usage:       "Override minimum number of instances",
+								DefaultText: "0",
+							},
+							&cli.IntFlag{
+								Name:        "max-instances",
+								Aliases:     []string{"max"},
+								Usage:       "Override maximum number of instances",
+								DefaultText: "1",
+							},
+							&cli.IntFlag{
+								Name:        "port",
+								Aliases:     []string{"p"},
+								Usage:       "Override port the application listens on",
+								DefaultText: "8080",
+							},
+							&cli.StringFlag{
+								Name:    "file",
+								Aliases: []string{"f"},
+								Usage:   "Path to Dockerfile or Containerfile",
+							},
+							&cli.StringFlag{
+								Name:    "context",
+								Aliases: []string{"c"},
+								Usage:   "Docker build context path",
+								Value:   ".",
+							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the deployment to complete",
+							},
+						},
+					},
+					{
 						Name:    "list",
 						Aliases: []string{"l"},
 						Usage:   "List all deployments",
