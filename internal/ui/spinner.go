@@ -21,7 +21,7 @@ func ShowSpinner(message string, fn func() error) error {
 			case <-done:
 				return
 			default:
-				fmt.Printf("\r%s %s", spinner[i%len(spinner)], message)
+				fmt.Printf("\r\033[K%s %s", spinner[i%len(spinner)], message)
 				i++
 				time.Sleep(100 * time.Millisecond)
 			}

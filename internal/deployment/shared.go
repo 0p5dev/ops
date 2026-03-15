@@ -1,15 +1,18 @@
 package deployment
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"strings"
 	"syscall"
 
 	"github.com/0p5dev/ops/internal/auth"
@@ -36,6 +39,22 @@ type TransmitImageResponse struct {
 type CreateOrUpdateDeploymentResponseBody struct {
 	JobId   string `json:"job_id"`
 	Message string `json:"message"`
+}
+
+type deploymentAlreadyExistsError struct {
+	deploymentName string
+}
+
+func (e *deploymentAlreadyExistsError) Error() string {
+	return fmt.Sprintf("deployment '%s' already exists", e.deploymentName)
+}
+
+type deploymentNotFoundError struct {
+	deploymentName string
+}
+
+func (e *deploymentNotFoundError) Error() string {
+	return fmt.Sprintf("deployment '%s' not found", e.deploymentName)
 }
 
 type deploymentOperation func(ctx context.Context, deploymentName string, fqin string, token string, config config.Config, noWait bool) (serviceUrl string, err error)
@@ -147,6 +166,116 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 	}
 
 	return respBody.Fqin, nil
+}
+
+func handleCommonDeploymentHttpErrors(resp *http.Response) (handled bool, err error) {
+	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
+		resp.Body.Close()
+		return true, fmt.Errorf("authentication failed: please log in again with 'ops login'")
+	}
+
+	if resp.StatusCode == http.StatusRequestTimeout {
+		defer resp.Body.Close()
+		var errResp map[string]string
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		if msg, ok := errResp["error"]; ok {
+			return true, fmt.Errorf("%s", msg)
+		}
+		return true, fmt.Errorf("deployment was cancelled")
+	}
+
+	return false, nil
+}
+
+func handleAcceptedDeploymentResponse(ctx context.Context, client *http.Client, resp *http.Response, controllerBaseURL string, token string, noWait bool) (serviceUrl string, err error) {
+	defer resp.Body.Close()
+
+	var respBody CreateOrUpdateDeploymentResponseBody
+	err = json.NewDecoder(resp.Body).Decode(&respBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve job_id, cannot watch deployment progress: %v", err)
+	}
+
+	if noWait {
+		return "", nil
+	}
+
+	return watchProvisioningJob(ctx, client, controllerBaseURL, respBody.JobId, token)
+}
+
+func watchProvisioningJob(ctx context.Context, client *http.Client, controllerBaseURL string, jobID string, token string) (serviceUrl string, err error) {
+	streamReq, err := http.NewRequestWithContext(
+		ctx,
+		"GET",
+		fmt.Sprintf("%s/api/v1/provisioning-jobs/%s/status", controllerBaseURL, jobID),
+		nil,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create provisioning stream request: %v", err)
+	}
+	streamReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	streamReq.Header.Set("Accept", "text/event-stream")
+
+	streamResp, err := client.Do(streamReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to provisioning stream: %v", err)
+	}
+	defer streamResp.Body.Close()
+
+	if (streamResp.StatusCode == http.StatusUnauthorized) || (streamResp.StatusCode == http.StatusForbidden) {
+		return "", fmt.Errorf("authentication failed: please log in again with 'ops login'")
+	}
+
+	if streamResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to stream provisioning job: status code %v", streamResp.Status)
+	}
+
+	scanner := bufio.NewScanner(streamResp.Body)
+	var eventType string
+	var dataLines []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if line == "" {
+			if eventType == "message" {
+				data := strings.Join(dataLines, "\n")
+
+				var msgBody ProvisioningJobUpdate
+				if err := json.Unmarshal([]byte(data), &msgBody); err == nil && msgBody.ServiceUrl != nil {
+					return *msgBody.ServiceUrl, nil
+				}
+
+				return data, nil
+			}
+
+			eventType = ""
+			dataLines = nil
+			continue
+		}
+
+		if after, ok := strings.CutPrefix(line, "event:"); ok {
+			eventType = strings.TrimSpace(after)
+			continue
+		}
+
+		if after, ok := strings.CutPrefix(line, "data:"); ok {
+			dataLines = append(dataLines, strings.TrimSpace(after))
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("deployment was cancelled")
+		}
+		return "", fmt.Errorf("error reading provisioning stream: %v", err)
+	}
+
+	if ctx.Err() != nil {
+		return "", fmt.Errorf("deployment was cancelled")
+	}
+
+	return "", fmt.Errorf("provisioning stream closed before message event")
 }
 
 func performDeployment(ctx context.Context, cmd *cli.Command, token string, config config.Config, deployOp deploymentOperation) error {
@@ -284,17 +413,60 @@ func performDeployment(ctx context.Context, cmd *cli.Command, token string, conf
 
 	// Create/update deployment with spinner
 	var serviceUrl string
-	err = ui.ShowSpinner("Deploying...", func() error {
-		var deployErr error
-		serviceUrl, deployErr = deployOp(ctx, deploymentName, fqin, token, config, cmd.Bool("no-wait"))
-		return deployErr
-	})
+	runDeploy := func(op deploymentOperation) error {
+		return ui.ShowSpinner("Deploying...", func() error {
+			var deployErr error
+			serviceUrl, deployErr = op(ctx, deploymentName, fqin, token, config, cmd.Bool("no-wait"))
+			return deployErr
+		})
+	}
+
+	err = runDeploy(deployOp)
 	if err != nil {
-		// Check if it was cancelled
-		if ctx.Err() != nil {
-			return fmt.Errorf("deployment cancelled")
+		var conflictErr *deploymentAlreadyExistsError
+		var notFoundErr *deploymentNotFoundError
+
+		if errors.As(err, &conflictErr) {
+			fmt.Printf("A deployment named '%s' already exists.\n", deploymentName)
+			shouldUpdate, promptErr := prompts.PromptConfirmation("Would you like to update that deployment instead?")
+			if promptErr != nil {
+				return fmt.Errorf("failed to confirm update choice: %w", promptErr)
+			}
+			if !shouldUpdate {
+				return err
+			}
+
+			err = runDeploy(updateDeployment)
+			if err != nil {
+				if ctx.Err() != nil {
+					return fmt.Errorf("deployment cancelled")
+				}
+				return fmt.Errorf("failed to deploy: %v", err)
+			}
+		} else if errors.As(err, &notFoundErr) {
+			fmt.Printf("A deployment named '%s' does not exist.\n", deploymentName)
+			shouldCreate, promptErr := prompts.PromptConfirmation("Would you like to create that deployment instead?")
+			if promptErr != nil {
+				return fmt.Errorf("failed to confirm create choice: %w", promptErr)
+			}
+			if !shouldCreate {
+				return err
+			}
+
+			err = runDeploy(createDeployment)
+			if err != nil {
+				if ctx.Err() != nil {
+					return fmt.Errorf("deployment cancelled")
+				}
+				return fmt.Errorf("failed to deploy: %v", err)
+			}
+		} else {
+			// Check if it was cancelled
+			if ctx.Err() != nil {
+				return fmt.Errorf("deployment cancelled")
+			}
+			return fmt.Errorf("failed to deploy: %v", err)
 		}
-		return fmt.Errorf("failed to deploy: %v", err)
 	}
 
 	if cmd.Bool("no-wait") {

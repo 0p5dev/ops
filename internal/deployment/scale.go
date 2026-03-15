@@ -2,10 +2,7 @@ package deployment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
 
 	"github.com/0p5dev/ops/internal/config"
 	prompts "github.com/0p5dev/ops/internal/prompts"
@@ -86,7 +83,7 @@ func performScaling(ctx context.Context, deploymentName string, minInstances, ma
 	var err error
 
 	// Get deployment details with spinner
-	err = ui.ShowSpinner("Retrieving deployment details...", func() error {
+	err = ui.ShowSpinner("Retrieving deployment...", func() error {
 		details, err = getDeploymentDetails(deploymentName, token, config)
 		return err
 	})
@@ -98,44 +95,13 @@ func performScaling(ctx context.Context, deploymentName string, minInstances, ma
 	// Update scaling configuration
 	details.Scaling.MinInstances = minInstances
 	details.Scaling.MaxInstances = maxInstances
+	min := int(details.Scaling.MinInstances)
+	max := int(details.Scaling.MaxInstances)
 
 	// Scale deployment with spinner
 	err = ui.ShowSpinner("Scaling deployment...", func() error {
-		// Prepare request body
-		bodyBytes, err := json.Marshal(map[string]interface{}{
-			"name":            details.Name,
-			"container_image": details.Image,
-			"min_instances":   details.Scaling.MinInstances,
-			"max_instances":   details.Scaling.MaxInstances,
-		})
-		if err != nil {
-			return err
-		}
-
-		// Create HTTP request to update scaling
-		req, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/v1/deployments", config.ControllerBaseUrl), strings.NewReader(string(bodyBytes)))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		req.Header.Set("Content-Type", "application/json")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
-			return fmt.Errorf("authentication failed: please log in again with 'ops login'")
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("failed to scale deployment: %s", resp.Status)
-		}
-
-		return nil
+		_, err = updateDeploymentWithParams(ctx, deploymentName, details.Image, token, config, &min, &max, nil, false)
+		return err
 	})
 
 	if err != nil {
