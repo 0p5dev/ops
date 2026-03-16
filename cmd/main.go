@@ -184,6 +184,16 @@ func main() {
 								Usage:       "Maximum number of instances",
 								DefaultText: "prompt if not provided",
 							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the scale operation to complete",
+							},
 						},
 					},
 					{

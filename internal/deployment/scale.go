@@ -62,23 +62,25 @@ func Scale(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("min-instances cannot be greater than max-instances")
 	}
 
-	// Confirm scaling operation
-	confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to scale deployment '%s' to min=%d, max=%d instances", deploymentName, minInstances, maxInstances))
-	if err != nil {
-		return fmt.Errorf("confirmation prompt failed: %w", err)
-	}
-	if !confirmed {
-		fmt.Println("Scaling operation cancelled")
-		return nil
+	// Confirm scaling operation unless --yes/-y is set
+	if !cmd.Bool("yes") {
+		confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to scale deployment '%s' to min=%d, max=%d instances", deploymentName, minInstances, maxInstances))
+		if err != nil {
+			return fmt.Errorf("confirmation prompt failed: %w", err)
+		}
+		if !confirmed {
+			fmt.Println("Scaling operation cancelled")
+			return nil
+		}
 	}
 
 	// Perform scaling with UI feedback
 	return withAuthRetry(ctx, config, func(token string) error {
-		return performScaling(ctx, deploymentName, minInstances, maxInstances, token, config)
+		return performScaling(ctx, deploymentName, minInstances, maxInstances, token, config, cmd.Bool("no-wait"))
 	})
 }
 
-func performScaling(ctx context.Context, deploymentName string, minInstances, maxInstances int32, token string, config config.Config) error {
+func performScaling(ctx context.Context, deploymentName string, minInstances, maxInstances int32, token string, config config.Config, noWait bool) error {
 	var details DeploymentDetails
 	var err error
 
@@ -97,10 +99,11 @@ func performScaling(ctx context.Context, deploymentName string, minInstances, ma
 	details.Scaling.MaxInstances = maxInstances
 	min := int(details.Scaling.MinInstances)
 	max := int(details.Scaling.MaxInstances)
+	var serviceURL string
 
 	// Scale deployment with spinner
 	err = ui.ShowSpinner("Scaling deployment...", func() error {
-		_, err = updateDeploymentWithParams(ctx, deploymentName, details.Image, token, config, &min, &max, nil, false)
+		serviceURL, err = updateDeploymentWithParams(ctx, deploymentName, details.Image, token, config, &min, &max, nil, noWait)
 		return err
 	})
 
@@ -108,10 +111,18 @@ func performScaling(ctx context.Context, deploymentName string, minInstances, ma
 		return fmt.Errorf("scaling failed: %w", err)
 	}
 
+	if noWait {
+		fmt.Println("✓ Deployment scale update pending. Run 'ops deployment describe " + deploymentName + "' to check status.")
+		return nil
+	}
+
 	// Success message with details
 	fmt.Printf("✓ Deployment '%s' scaled successfully!\n", deploymentName)
 	fmt.Printf("  • Min instances: %d\n", minInstances)
 	fmt.Printf("  • Max instances: %d\n", maxInstances)
+	if serviceURL != "" {
+		fmt.Printf("  • URL: %s\n", serviceURL)
+	}
 	fmt.Println()
 	fmt.Println("The deployment will automatically adjust the number of instances based on demand.")
 
