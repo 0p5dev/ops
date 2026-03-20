@@ -34,5 +34,5 @@ availableSecrets:
       env: "SUPABASE_URL"
     - versionName: projects/160851347747/secrets/ops-controller-supabase-anon-public-key/versions/1
       env: "SUPABASE_API_KEY"
-    - versionName: projects/160851347747/secrets/ops-github-access-token/versions/1
+    - versionName: projects/160851347747/secrets/webapp-github-api-token/versions/1
       env: "GITHUB_TOKEN"
