@@ -59,16 +59,19 @@ func Destroy(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Confirm destruction
-	confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to destroy deployment '%s'", deploymentName))
-	if err != nil {
-		return fmt.Errorf("confirmation prompt failed: %w", err)
-	}
-	if !confirmed {
-		fmt.Println("Deployment destruction cancelled")
-		return nil
+	if !cmd.Bool("yes") {
+		confirmed, err := prompts.PromptConfirmation(fmt.Sprintf("Are you sure you want to destroy deployment '%s'", deploymentName))
+		if err != nil {
+			return fmt.Errorf("confirmation prompt failed: %w", err)
+		}
+		if !confirmed {
+			fmt.Println("Deployment destruction cancelled")
+			return nil
+		}
 	}
 
 	// Perform destruction with auth retry
+	var err error
 	err = withAuthRetry(ctx, config, func(token string) error {
 		return ui.ShowSpinner("Destroying deployment...", func() error {
 			return destroyDeployment(deploymentName, token, config)

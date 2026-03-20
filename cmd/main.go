@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"os"
 
 	"github.com/0p5dev/ops/internal/auth"
@@ -14,13 +14,14 @@ import (
 func main() {
 	config, err := config.LoadConfig()
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
+		fmt.Printf("failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
 	cmd := &cli.Command{
-		Name:  "ops",
-		Usage: "A CLI tool to deploy developer-first, autoscaling applications",
+		Name:                   "ops",
+		Usage:                  "A CLI tool to deploy developer-first, autoscaling applications",
+		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			{
 				Name:    "deployment",
@@ -68,6 +69,66 @@ func main() {
 								Usage:   "Docker build context path",
 								Value:   ".",
 							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the deployment to complete",
+							},
+						},
+					},
+					{
+						Name:    "update",
+						Aliases: []string{"u"},
+						Usage:   "Update a deployment",
+						Action:  deployment.Update,
+						Metadata: map[string]any{
+							"config": config,
+						},
+						Flags: []cli.Flag{
+							&cli.IntFlag{
+								Name:        "min-instances",
+								Aliases:     []string{"min"},
+								Usage:       "Override minimum number of instances",
+								DefaultText: "0",
+							},
+							&cli.IntFlag{
+								Name:        "max-instances",
+								Aliases:     []string{"max"},
+								Usage:       "Override maximum number of instances",
+								DefaultText: "1",
+							},
+							&cli.IntFlag{
+								Name:        "port",
+								Aliases:     []string{"p"},
+								Usage:       "Override port the application listens on",
+								DefaultText: "8080",
+							},
+							&cli.StringFlag{
+								Name:    "file",
+								Aliases: []string{"f"},
+								Usage:   "Path to Dockerfile or Containerfile",
+							},
+							&cli.StringFlag{
+								Name:    "context",
+								Aliases: []string{"c"},
+								Usage:   "Docker build context path",
+								Value:   ".",
+							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the deployment to complete",
+							},
 						},
 					},
 					{
@@ -94,6 +155,13 @@ func main() {
 						Metadata: map[string]any{
 							"config": config,
 						},
+						Flags: []cli.Flag{
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+						},
 					},
 					{
 						Name:    "scale",
@@ -115,6 +183,16 @@ func main() {
 								Aliases:     []string{"max"},
 								Usage:       "Maximum number of instances",
 								DefaultText: "prompt if not provided",
+							},
+							&cli.BoolFlag{
+								Name:    "yes",
+								Aliases: []string{"y"},
+								Usage:   "Automatically confirm prompts",
+							},
+							&cli.BoolFlag{
+								Name:    "no-wait",
+								Aliases: []string{"n"},
+								Usage:   "Do not wait for the scale operation to complete",
 							},
 						},
 					},
@@ -150,7 +228,7 @@ func main() {
 	}
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
-		slog.Error("command failed", "error", err)
+		fmt.Printf("command failed: %v\n", err)
 		os.Exit(1)
 	}
 }

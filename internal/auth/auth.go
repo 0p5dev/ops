@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/urfave/cli/v3"
@@ -39,6 +41,23 @@ type SupabaseAuthResponse struct {
 		ID    string `json:"id"`
 		Email string `json:"email"`
 	} `json:"user"`
+}
+
+func openBrowser(targetURL string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "linux":
+		cmd = exec.Command("xdg-open", targetURL)
+	case "darwin":
+		cmd = exec.Command("open", targetURL)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", targetURL)
+	default:
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	return cmd.Start()
 }
 
 // PerformLogin performs the login flow programmatically
@@ -149,7 +168,13 @@ func PerformLogin(ctx context.Context, cfg config.Config) error {
 	redirectURL := "http://localhost:54321/callback"
 	authURL := fmt.Sprintf("%s/auth/v1/authorize?provider=%s&redirect_to=%s", supabaseURL, provider, url.QueryEscape(redirectURL))
 
-	fmt.Println("Please visit this URL to authenticate with", provider, ":")
+	if err := openBrowser(authURL); err != nil {
+		fmt.Printf("Could not open browser automatically (%v).\n", err)
+	} else {
+		fmt.Println("Opened your browser for", provider, "authentication.")
+	}
+
+	fmt.Println("If the browser did not open, visit this URL to authenticate with", provider, ":")
 	fmt.Println(authURL)
 
 	// Wait for callback or timeout
