@@ -13,9 +13,9 @@ import (
 
 type UpdateDeploymentRequestBody struct {
 	ContainerImage string `json:"container_image"`
-	MinInstances   *int   `json:"min_instances,omitempty,string"`
-	MaxInstances   *int   `json:"max_instances,omitempty,string"`
-	Port           *int   `json:"port,omitempty,string"`
+	MinInstances   *int   `json:"min_instances,omitempty"`
+	MaxInstances   *int   `json:"max_instances,omitempty"`
+	Port           *int   `json:"port,omitempty"`
 }
 
 func updateDeployment(ctx context.Context, deploymentName string, fqin string, token string, config config.Config, noWait bool) (serviceUrl string, err error) {
