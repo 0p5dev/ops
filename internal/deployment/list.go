@@ -49,7 +49,11 @@ func List(ctx context.Context, cmd *cli.Command) error {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("Warning: failed to close user info response body: %v\n", closeErr)
+			}
+		}()
 
 		if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
 			return fmt.Errorf("authentication failed: please log in again with 'ops login'")

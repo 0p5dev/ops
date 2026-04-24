@@ -12,6 +12,9 @@ run:
 build:
     go build -o ops cmd/main.go
 
+lint:
+    golangci-lint run
+
 tidy:
     go mod tidy
 

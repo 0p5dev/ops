@@ -135,7 +135,11 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close compressed image file: %v\n", closeErr)
+		}
+	}()
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/container-images", controllerBaseUrl), file)
 	if err != nil {
@@ -149,7 +153,11 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("warning: failed to close user info response body: %v\n", closeErr)
+		}
+	}()
 
 	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
 		return "", fmt.Errorf("authentication failed: please log in again (ops login)")
@@ -170,12 +178,19 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 
 func handleCommonDeploymentHttpErrors(resp *http.Response) (handled bool, err error) {
 	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
-		resp.Body.Close()
+		err = resp.Body.Close()
+		if err != nil {
+			fmt.Printf("warning: failed to close response body: %v\n", err)
+		}
 		return true, fmt.Errorf("authentication failed: please log in again with 'ops login'")
 	}
 
 	if resp.StatusCode == http.StatusRequestTimeout {
-		defer resp.Body.Close()
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("warning: failed to close response body: %v\n", closeErr)
+			}
+		}()
 		var errResp map[string]string
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		if msg, ok := errResp["error"]; ok {
@@ -188,7 +203,11 @@ func handleCommonDeploymentHttpErrors(resp *http.Response) (handled bool, err er
 }
 
 func handleAcceptedDeploymentResponse(ctx context.Context, client *http.Client, resp *http.Response, controllerBaseURL string, token string, noWait bool) (serviceUrl string, err error) {
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", closeErr)
+		}
+	}()
 
 	var respBody CreateOrUpdateDeploymentResponseBody
 	err = json.NewDecoder(resp.Body).Decode(&respBody)
@@ -220,7 +239,11 @@ func watchProvisioningJob(ctx context.Context, client *http.Client, controllerBa
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to provisioning stream: %v", err)
 	}
-	defer streamResp.Body.Close()
+	defer func() {
+		if closeErr := streamResp.Body.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close provisioning stream response body: %v\n", closeErr)
+		}
+	}()
 
 	if (streamResp.StatusCode == http.StatusUnauthorized) || (streamResp.StatusCode == http.StatusForbidden) {
 		return "", fmt.Errorf("authentication failed: please log in again with 'ops login'")
@@ -389,7 +412,10 @@ func performDeployment(ctx context.Context, cmd *cli.Command, token string, conf
 		return fmt.Errorf("failed to save container image: %v", err)
 	}
 	if ctx.Err() != nil {
-		os.Remove(filename) // cleanup
+		err = os.Remove(filename) // cleanup
+		if err != nil {
+			fmt.Printf("warning: failed to delete temporary file %s: %v\n", filename, err)
+		}
 		return fmt.Errorf("deployment cancelled")
 	}
 
@@ -401,7 +427,10 @@ func performDeployment(ctx context.Context, cmd *cli.Command, token string, conf
 		return fmt.Errorf("failed to transmit compressed image: %v", err)
 	}
 	if ctx.Err() != nil {
-		os.Remove(filename) // cleanup
+		err = os.Remove(filename) // cleanup
+		if err != nil {
+			fmt.Printf("warning: failed to delete temporary file %s: %v\n", filename, err)
+		}
 		return fmt.Errorf("deployment cancelled")
 	}
 
@@ -504,12 +533,12 @@ func findSubstring(s, substr string) bool {
 
 // withAuthRetry executes a function with automatic retry on auth failure
 func withAuthRetry(ctx context.Context, config config.Config, fn func(token string) error) error {
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := range 2 {
 		token, err := auth.GetBearerToken()
 		if err != nil {
 			if attempt == 0 {
 				fmt.Println("Authentication required. Starting login...")
-				if loginErr := auth.PerformLogin(ctx, config); loginErr != nil {
+				if loginErr := auth.PerformLogin(ctx, config, false); loginErr != nil {
 					return fmt.Errorf("failed to login: %w", loginErr)
 				}
 				continue
@@ -520,7 +549,7 @@ func withAuthRetry(ctx context.Context, config config.Config, fn func(token stri
 		err = fn(token)
 		if err != nil && isAuthError(err) && attempt == 0 {
 			fmt.Println("Authentication failed. Starting login...")
-			if loginErr := auth.PerformLogin(ctx, config); loginErr != nil {
+			if loginErr := auth.PerformLogin(ctx, config, false); loginErr != nil {
 				return fmt.Errorf("failed to login: %w", loginErr)
 			}
 			continue
@@ -540,6 +569,10 @@ func outputJSON[T any](data T) error {
 func outputYAML[T any](data T) error {
 	encoder := yaml.NewEncoder(os.Stdout)
 	encoder.SetIndent(2)
-	defer encoder.Close()
+	defer func() {
+		if closeErr := encoder.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close YAML encoder: %v\n", closeErr)
+		}
+	}()
 	return encoder.Encode(data)
 }

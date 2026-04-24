@@ -23,14 +23,18 @@ func destroyDeployment(deploymentName string, token string, config config.Config
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("Warning: failed to close user info response body: %v\n", closeErr)
+		}
+	}()
 
 	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
 		return fmt.Errorf("authentication failed: please log in again with 'ops login'")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Status: %s", resp.Status)
+		return fmt.Errorf("status: %s", resp.Status)
 	}
 
 	return nil
@@ -71,8 +75,7 @@ func Destroy(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Perform destruction with auth retry
-	var err error
-	err = withAuthRetry(ctx, config, func(token string) error {
+	err := withAuthRetry(ctx, config, func(token string) error {
 		return ui.ShowSpinner("Destroying deployment...", func() error {
 			return destroyDeployment(deploymentName, token, config)
 		})

@@ -223,6 +223,13 @@ func main() {
 				Metadata: map[string]any{
 					"config": config,
 				},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "no-open",
+						Aliases: []string{"n"},
+						Usage:   "Do not open the browser automatically",
+					},
+				},
 			},
 		},
 	}

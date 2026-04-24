@@ -55,13 +55,17 @@ func createDeployment(ctx context.Context, deploymentName string, fqin string, t
 	}
 
 	if resp.StatusCode == http.StatusConflict {
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			return "", fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 		return "", &deploymentAlreadyExistsError{deploymentName: deploymentName}
 	}
 
 	if resp.StatusCode != http.StatusAccepted {
-		resp.Body.Close()
-		return "", fmt.Errorf("An unknown error occurred.")
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			return "", fmt.Errorf("failed to close response body: %w", closeErr)
+		}
+		return "", fmt.Errorf("an unknown error occurred")
 	}
 
 	return handleAcceptedDeploymentResponse(ctx, client, resp, config.ControllerBaseUrl, token, noWait)

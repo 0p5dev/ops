@@ -5,6 +5,12 @@ steps:
     env: ["PROJECT_ROOT=github.com/0p5dev/ops"]
     args: ["env"]
 
+  - id: Lint
+    name: golangci/golangci-lint:v2.11.4
+    entrypoint: golangci-lint
+    args: ["run", "./..."]
+    allowFailure: true
+
   # Create github release.
   - id: Create Release
     name: goreleaser/goreleaser
@@ -34,5 +40,5 @@ availableSecrets:
       env: "SUPABASE_URL"
     - versionName: projects/160851347747/secrets/ops-controller-supabase-anon-public-key/versions/1
       env: "SUPABASE_API_KEY"
-    - versionName: projects/160851347747/secrets/webapp-github-api-token/versions/1
+    - versionName: projects/160851347747/secrets/webapp-github-api-token/versions/2
       env: "GITHUB_TOKEN"

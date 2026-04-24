@@ -48,14 +48,18 @@ func getDeploymentDetails(deploymentName string, token string, config config.Con
 	if err != nil {
 		return details, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("warning: failed to close user info response body: %v\n", closeErr)
+		}
+	}()
 
 	if (resp.StatusCode == http.StatusUnauthorized) || (resp.StatusCode == http.StatusForbidden) {
 		return details, fmt.Errorf("authentication failed: please log in again with 'ops login'")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return details, fmt.Errorf("Status: %s", resp.Status)
+		return details, fmt.Errorf("status: %s", resp.Status)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {

@@ -61,12 +61,13 @@ func PromptProviderSelection() (string, error) {
 		return "", fmt.Errorf("prompt failed %v", err)
 	}
 	// Return lowercase provider for use in URL
-	if idx == 0 {
+	switch idx {
+	case 0:
 		return "github", nil
-	} else if idx == 1 {
+	case 1:
 		return "google", nil
 	}
-	return "", fmt.Errorf("invalid provider selection")
+	return "", fmt.Errorf("Invalid provider selection")
 }
 
 // PromptForInt prompts the user for an integer value within a range

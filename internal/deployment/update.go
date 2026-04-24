@@ -62,13 +62,22 @@ func executeUpdateDeploymentRequest(ctx context.Context, deploymentName string, 
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		resp.Body.Close()
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("warning: failed to close response body: %v\n", closeErr)
+			}
+		}()
 		return "", &deploymentNotFoundError{deploymentName: deploymentName}
 	}
 
 	if resp.StatusCode != http.StatusAccepted {
-		resp.Body.Close()
-		return "", fmt.Errorf("An unknown error occurred.")
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("warning: failed to close response body: %v\n", closeErr)
+			}
+		}()
+
+		return "", fmt.Errorf("an unknown error occurred")
 	}
 
 	return handleAcceptedDeploymentResponse(ctx, client, resp, config.ControllerBaseUrl, token, noWait)
