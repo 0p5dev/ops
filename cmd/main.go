@@ -11,6 +11,8 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+var Version string
+
 func main() {
 	config, err := config.LoadConfig()
 	if err != nil {
@@ -18,7 +20,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	cli.VersionPrinter = func(cmd *cli.Command) {
+		fmt.Printf("ops %s\n", Version)
+	}
+
 	cmd := &cli.Command{
+		Version:                Version,
 		Name:                   "ops",
 		Usage:                  "A CLI tool to deploy developer-first, autoscaling applications",
 		UseShortOptionHandling: true,

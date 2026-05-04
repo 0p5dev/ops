@@ -163,6 +163,10 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 		return "", fmt.Errorf("authentication failed: please log in again (ops login)")
 	}
 
+	if resp.StatusCode == http.StatusPaymentRequired {
+		return "", fmt.Errorf("You must have a valid payment method on file to deploy applications. Please visit https://0p5.dev/billing/payment-method to add a payment method.")
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("status code %v", resp.Status)
 	}
