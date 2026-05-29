@@ -12,8 +12,8 @@ func validateProjectName(input string) error {
 	if len(input) < 3 {
 		return fmt.Errorf("project name must be at least 3 characters")
 	}
-	if len(input) > 32 {
-		return fmt.Errorf("project name must be at most 32 characters")
+	if len(input) > 20 {
+		return fmt.Errorf("project name must be at most 20 characters")
 	}
 
 	matched, _ := regexp.MatchString("^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$", input)

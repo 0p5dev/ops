@@ -131,31 +131,32 @@ func saveContainerImage(tag string, filename string) error {
 }
 
 func transmitCompressedImage(filename string, token string, controllerBaseUrl string) (fqin string, err error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return "", err
+	// 1. Get a signed URL from the controller
+	reqBody := struct {
+		ImageName string `json:"image_name"`
+	}{
+		ImageName: filename,
 	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			fmt.Printf("Warning: failed to close compressed image file: %v\n", closeErr)
-		}
-	}()
+	reqBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal signed URL request: %w", err)
+	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/container-images", controllerBaseUrl), file)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/container-images/signed-url", controllerBaseUrl), bytes.NewReader(reqBytes))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
+		return "", fmt.Errorf("failed to create signed URL request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/gzip")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to fetch signed URL: %w", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			fmt.Printf("warning: failed to close user info response body: %v\n", closeErr)
+			fmt.Printf("warning: failed to close response body: %v\n", closeErr)
 		}
 	}()
 
@@ -167,14 +168,92 @@ func transmitCompressedImage(filename string, token string, controllerBaseUrl st
 		return "", fmt.Errorf("You must have a valid payment method on file to deploy applications. Please visit https://0p5.dev/billing/payment-method to add a payment method.")
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("status code %v", resp.Status)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("signed URL endpoint returned status code %v", resp.Status)
+	}
+
+	var buf bytes.Buffer
+	if _, err = buf.ReadFrom(resp.Body); err != nil {
+		return "", fmt.Errorf("failed to read signed URL response: %w", err)
+	}
+	rawResp := strings.TrimSpace(buf.String())
+	if rawResp == "" {
+		return "", fmt.Errorf("failed to retrieve signed URL from response: empty response")
+	}
+
+	var signedURL string
+	if strings.HasPrefix(rawResp, `"`) && strings.HasSuffix(rawResp, `"`) {
+		if err = json.Unmarshal([]byte(rawResp), &signedURL); err != nil {
+			return "", fmt.Errorf("failed to decode signed URL JSON string: %w", err)
+		}
+	} else {
+		signedURL = rawResp
+	}
+
+	// 2. Upload the gzipped OCI image to GCP Cloud Storage using PUT
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+
+	uploadReq, err := http.NewRequest("PUT", signedURL, file)
+	if err != nil {
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("warning: failed to close compressed image file: %v\n", closeErr)
+		}
+		return "", fmt.Errorf("failed to create upload request: %w", err)
+	}
+	uploadReq.Header.Set("Content-Type", "application/gzip")
+
+	uploadResp, err := client.Do(uploadReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload image to storage: %w", err)
+	}
+	defer func() {
+		if closeErr := uploadResp.Body.Close(); closeErr != nil {
+			fmt.Printf("warning: failed to close upload response body: %v\n", closeErr)
+		}
+	}()
+
+	if uploadResp.StatusCode != http.StatusOK && uploadResp.StatusCode != http.StatusCreated {
+		var bodyBuf bytes.Buffer
+		_, _ = bodyBuf.ReadFrom(uploadResp.Body)
+		return "", fmt.Errorf("failed to upload image to storage: status code %v, response: %s", uploadResp.Status, bodyBuf.String())
+	}
+
+	// 3. Call the container-images endpoint to complete registration
+	confirmReq, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/container-images", controllerBaseUrl), bytes.NewReader(reqBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create container image registration request: %w", err)
+	}
+	confirmReq.Header.Set("Content-Type", "application/json")
+	confirmReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	confirmResp, err := client.Do(confirmReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to register container image: %w", err)
+	}
+	defer func() {
+		if closeErr := confirmResp.Body.Close(); closeErr != nil {
+			fmt.Printf("warning: failed to close container image registration response body: %v\n", closeErr)
+		}
+	}()
+
+	if (confirmResp.StatusCode == http.StatusUnauthorized) || (confirmResp.StatusCode == http.StatusForbidden) {
+		return "", fmt.Errorf("authentication failed: please log in again (ops login)")
+	}
+
+	if confirmResp.StatusCode == http.StatusPaymentRequired {
+		return "", fmt.Errorf("You must have a valid payment method on file to deploy applications. Please visit https://0p5.dev/billing/payment-method to add a payment method.")
+	}
+
+	if confirmResp.StatusCode != http.StatusOK && confirmResp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("container image registration returned status code %v", confirmResp.Status)
 	}
 
 	var respBody TransmitImageResponse
-	err = json.NewDecoder(resp.Body).Decode(&respBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode response body: %v", err)
+	if err = json.NewDecoder(confirmResp.Body).Decode(&respBody); err != nil {
+		return "", fmt.Errorf("failed to decode container image registration response: %w", err)
 	}
 
 	return respBody.Fqin, nil
